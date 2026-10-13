@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>সহজ হিসাব — অ্যাডমিন</title>
+<link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<style>
+  :root{ --bg:#f7f7f9; --ink:#20242c; --soft:#6f7785; --line:#e6e8ec; --gold:#f5b400; --green:#1aa251; --red:#e0342c; --blue:#2563eb; }
+  *{box-sizing:border-box;} body{ margin:0; background:var(--bg); color:var(--ink); font-family:'Hind Siliguri',sans-serif; font-size:16px; line-height:1.4; }
+  button,input,textarea{ font-family:inherit; font-size:1rem; } button{ cursor:pointer; border:none; }
+  .wrap{ max-width:640px; margin:0 auto; padding:14px; }
+  .hdr{ background:linear-gradient(135deg,#ffcd3c,#f5a900); padding:16px 14px; border-radius:0 0 18px 18px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; }
+  .hdr h1{ margin:0; font-size:1.15rem; }
+  .card{ background:#fff; border:1px solid var(--line); border-radius:14px; padding:12px; margin-bottom:10px; }
+  .btn{ border-radius:10px; padding:9px 12px; font-weight:700; background:#fff; border:2px solid var(--line); }
+  .btn.p{ background:var(--gold); border-color:var(--gold); } .btn.g{ background:var(--green); border-color:var(--green); color:#fff; } .btn.r{ color:var(--red); }
+  .row{ display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; } .row .btn{ flex:1; min-width:96px; font-size:.82rem; text-align:center; text-decoration:none; color:inherit; }
+  .field{ width:100%; padding:11px; border:2px solid var(--line); border-radius:10px; margin:4px 0 10px; background:#fff; }
+  label{ font-weight:600; font-size:.9rem; } .s{ color:var(--soft); font-size:.85rem; }
+  .badge{ display:inline-block; padding:2px 9px; border-radius:20px; font-size:.78rem; font-weight:700; margin-left:4px; }
+  .b-g{ background:#e5f7ec; color:var(--green);} .b-r{ background:#fdeaea; color:var(--red);} .b-y{ background:#fff3cd; color:#7a5b00;} .b-b{ background:#e6eeff; color:var(--blue);}
+  .stats{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:10px; } .stats .card{ text-align:center; margin:0; padding:10px 4px; } .stats b{ font-size:1.5rem; display:block; }
+  h2{ font-size:1.05rem; margin:16px 0 8px; }
+  #modalBg{ position:fixed; inset:0; background:rgba(20,20,25,.55); display:none; align-items:center; justify-content:center; padding:16px; z-index:9; }
+  #modal{ background:#fff; border-radius:16px; padding:18px; width:100%; max-width:420px; text-align:center; }
+  .pin{ font-size:2.6rem; font-weight:800; letter-spacing:.35rem; margin:6px 0; }
+  .msg{ padding:9px; border-radius:10px; background:#fdeaea; color:var(--red); margin:8px 0; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="modalBg"><div id="modal"></div></div>
+<script>
+const CFG = window.SK_CONFIG || {};
+const OK = /^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(CFG.SUPABASE_URL||'') && (CFG.SUPABASE_KEY||'').length > 20;
+const sb = supabase.createClient(OK?CFG.SUPABASE_URL:'https://placeholder.supabase.co', OK?CFG.SUPABASE_KEY:'placeholder-key-placeholder');
+const DOMAIN = 'khata.app';
+const $ = id => document.getElementById(id);
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const bn = n => String(n).replace(/[0-9]/g,d=>'০১২৩৪৫৬৭৮৯'[d]);
+const A = { me:null, profiles:[], reqs:[], cfg:{} };
+const phoneOf = p => (p.email||'').endsWith('@'+DOMAIN) ? p.email.split('@')[0] : '';
+const fmtDate = d => d ? new Date(d).toLocaleDateString('bn-BD',{day:'numeric',month:'short',year:'numeric'}) : '—';
+const daysAgo = d => d ? Math.floor((Date.now()-new Date(d).getTime())/86400000) : null;
+
+function login(msg){
+  $('app').innerHTML = `<div class="wrap" style="padding-top:12vh"><h1 style="text-align:center">🔐 অ্যাডমিন</h1>
+    ${OK?'':'<div class="msg">config.js-এ Supabase লিংক/কী বসানো হয়নি।</div>'}
+    <label>মোবাইল নাম্বার</label><input class="field" id="ph" type="tel" inputmode="numeric" placeholder="01XXXXXXXXX">
+    <label>৬ সংখ্যার পিন</label><input class="field" id="pw" type="password" inputmode="numeric" maxlength="6">
+    ${msg?`<div class="msg">${esc(msg)}</div>`:''}
+    <button class="btn p" style="width:100%" onclick="doLogin()">ঢুকুন</button></div>`;
+}
+async function doLogin(){
+  const ph = $('ph').value.replace(/[^0-9]/g,''), pw = $('pw').value;
+  const { error } = await sb.auth.signInWithPassword({ email:ph+'@'+DOMAIN, password:pw });
+  if(error){ login('নাম্বার বা পিন ভুল, অথবা ইন্টারনেট নেই।'); return; }
+  boot();
+}
+async function boot(){
+  const { data:{ session } } = await sb.auth.getSession();
+  if(!session){ login(); return; }
+  const me = await sb.from('profiles').select('*').eq('id',session.user.id).maybeSingle();
+  A.me = me.data;
+  if(!A.me || !A.me.is_admin){ $('app').innerHTML = `<div class="wrap" style="padding-top:12vh;text-align:center"><h1>⛔ আপনি অ্যাডমিন নন</h1><p class="s">SETUP.md-এর "প্রথম অ্যাডমিন বানানো" ধাপটা করুন।</p><button class="btn" onclick="logout()">লগআউট</button></div>`; return; }
+  await load(); draw();
+}
+async function load(){
+  const [p, r, c] = await Promise.all([
+    sb.from('profiles').select('*').order('created_at',{ascending:false}),
+    sb.from('pin_reset_requests').select('*').eq('status','pending').order('created_at',{ascending:false}),
+    sb.from('app_config').select('*').eq('id',1).maybeSingle(),
+  ]);
+  A.profiles = p.data||[]; A.reqs = r.data||[]; A.cfg = c.data||{};
+}
+function statusBadge(p){
+  if(p.is_admin) return '<span class="badge b-y">অ্যাডমিন</span>';
+  if(!p.access_expires_at) return '<span class="badge b-g">আজীবন</span>';
+  if(new Date(p.access_expires_at).getTime() < Date.now()) return '<span class="badge b-r">মেয়াদ শেষ</span>';
+  return `<span class="badge b-g">চালু · ${fmtDate(p.access_expires_at)} পর্যন্ত</span>`;
+}
+function activeBadge(p){
+  const d = daysAgo(p.last_active_at);
+  if(d===null) return '<span class="badge b-r">কখনো ঢোকেনি</span>';
+  return `<span class="badge ${d>=30?'b-r':d>=7?'b-y':'b-b'}">${d<=0?'আজ ঢুকেছে':bn(d)+' দিন আগে ঢুকেছে'}</span>`;
+}
+function draw(){
+  const users = A.profiles.filter(p=>!p.is_admin).sort((a,b)=> (a.last_active_at?new Date(a.last_active_at).getTime():0) - (b.last_active_at?new Date(b.last_active_at).getTime():0));
+  const act7 = users.filter(p=>{ const d=daysAgo(p.last_active_at); return d!==null && d<7; }).length;
+  const exp = users.filter(p=>p.access_expires_at && new Date(p.access_expires_at).getTime()<Date.now()).length;
+  const cfg = A.cfg||{};
+  $('app').innerHTML = `<div class="hdr"><h1>👑 অ্যাডমিন</h1><button class="btn" onclick="logout()">লগআউট</button></div><div class="wrap">
+    <div class="stats"><div class="card"><b>${bn(users.length)}</b><span class="s">মোট ইউজার</span></div><div class="card"><b>${bn(act7)}</b><span class="s">গত ৭ দিনে সক্রিয়</span></div><div class="card"><b>${bn(exp)}</b><span class="s">মেয়াদ শেষ</span></div></div>
+    ${A.reqs.length?`<div class="card" style="border:2px solid var(--gold);background:#fff9e6"><b>🔑 পিন রিসেটের অনুরোধ (${bn(A.reqs.length)})</b>${A.reqs.map(r=>{
+      const p=A.profiles.find(x=>x.email===r.phone+'@'+DOMAIN);
+      return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px"><div><b>${p?esc(p.full_name||'(নাম নেই)'):'(অ্যাকাউন্ট নেই)'}</b><div class="s">${esc(r.phone)} · ${new Date(r.created_at).toLocaleString('bn-BD',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'})}</div></div>
+      ${p?`<button class="btn g" onclick="resetPin('${p.id}','${r.id}','${esc(r.phone)}')">🔑 নতুন পিন</button>`:`<button class="btn" onclick="dismissReq('${r.id}')">বাদ দিন</button>`}</div>`; }).join('')}</div>`:''}
+    <h2>ইউজার (যারা অনেকদিন আসেনি তারা আগে)</h2>
+    ${users.length? users.map(p=>{ const ph=phoneOf(p); return `<div class="card"><div><b>${esc(p.full_name||'(নাম নেই)')}</b> ${statusBadge(p)}</div>
+      <div class="s">${esc(ph||p.email||'')} · যোগ দিয়েছে ${fmtDate(p.created_at)}</div><div style="margin-top:4px">${activeBadge(p)}</div>
+      <div class="row"><button class="btn" onclick="extend('${p.id}',30)">+১ মাস</button><button class="btn" onclick="extend('${p.id}',365)">+১ বছর</button><button class="btn" onclick="lifetime('${p.id}')">আজীবন</button><button class="btn r" onclick="revoke('${p.id}')">এখনই বন্ধ</button></div>
+      <div class="row">${ph?`<a class="btn" target="_blank" href="https://wa.me/88${ph}?text=${encodeURIComponent('আসসালামু আলাইকুম '+(p.full_name||'')+', অনেকদিন ধরে আপনি সহজ হিসাব অ্যাপে ঢুকছেন না। কোনো সমস্যা হচ্ছে কি? সাহায্য লাগলে জানান।')}">💬 হোয়াটসঅ্যাপ</a><button class="btn" onclick="resetPin('${p.id}',null,'${ph}')">🔑 পিন রিসেট</button>`:''}</div></div>`; }).join('') : '<div class="card s" style="text-align:center">এখনো কোনো ইউজার নেই</div>'}
+    <h2>⚙️ যোগাযোগ ও পেমেন্ট তথ্য (মেয়াদ-শেষ স্ক্রিনে দেখায়)</h2>
+    <div class="card"><label>ফোন</label><input class="field" id="c_phone" value="${esc(cfg.contact_phone||'')}" placeholder="01XXXXXXXXX">
+    <label>হোয়াটসঅ্যাপ (দেশ-কোডসহ)</label><input class="field" id="c_wa" value="${esc(cfg.contact_whatsapp||'')}" placeholder="8801XXXXXXXXX">
+    <label>পেমেন্ট নির্দেশনা</label><textarea class="field" id="c_pay" rows="3" placeholder="যেমন: বিকাশে 01XXXXXXXXX নাম্বারে সেন্ড মানি করে স্ক্রিনশট পাঠান">${esc(cfg.payment_instructions||'')}</textarea>
+    <button class="btn p" style="width:100%" onclick="saveCfg()">সংরক্ষণ করুন</button></div></div>`;
+}
+async function setExpiry(id, iso){ const { error } = await sb.from('profiles').update({ access_expires_at:iso }).eq('id',id); if(error){ alert('হয়নি: '+error.message); return; } await load(); draw(); }
+function extend(id, days){ const p=A.profiles.find(x=>x.id===id); const base=Math.max(Date.now(), p&&p.access_expires_at?new Date(p.access_expires_at).getTime():0); setExpiry(id, new Date(base+days*86400000).toISOString()); }
+function lifetime(id){ if(confirm('আজীবন মেয়াদ দেবেন?')) setExpiry(id, null); }
+function revoke(id){ if(confirm('এখনই এই ইউজারের অ্যাক্সেস বন্ধ করবেন?')) setExpiry(id, new Date(Date.now()-1000).toISOString()); }
+async function dismissReq(id){ await sb.from('pin_reset_requests').update({ status:'done', handled_at:new Date().toISOString() }).eq('id',id); await load(); draw(); }
+async function saveCfg(){
+  const { error } = await sb.from('app_config').update({ contact_phone:$('c_phone').value||null, contact_whatsapp:$('c_wa').value.replace(/[^0-9]/g,'')||null, payment_instructions:$('c_pay').value||null, updated_at:new Date().toISOString() }).eq('id',1);
+  alert(error?('হয়নি: '+error.message):'সংরক্ষণ হয়েছে ✔'); if(!error){ await load(); draw(); }
+}
+async function resetPin(userId, reqId, phone){
+  if(!confirm('এই ইউজারের জন্য নতুন পিন বানাবেন? আগের পিন আর কাজ করবে না।')) return;
+  const { data, error } = await sb.functions.invoke('reset-pin', { body:{ user_id:userId, request_id:reqId||null } });
+  if(error || !data || data.error){ alert('পিন রিসেট হয়নি: '+((data&&data.error)||(error&&error.message)||'অজানা সমস্যা')+'\n(Supabase-এ reset-pin ফাংশন ডিপ্লয় করা আছে কিনা দেখুন — SETUP.md ধাপ ৫)'); return; }
+  const ph = data.phone || phone;
+  const msg = 'আসসালামু আলাইকুম। আপনার সহজ হিসাব অ্যাপের নতুন পিন: '+data.pin+' । এই পিন দিয়ে ঢুকুন, তারপর নিজের পছন্দের নতুন পিন বানিয়ে নেবেন।';
+  $('modal').innerHTML = `<h2 style="margin-top:0">🔑 নতুন পিন তৈরি হয়েছে</h2><div class="pin">${esc(data.pin)}</div><div>নাম্বার: ${esc(ph)}</div>
+    <a class="btn g" style="display:block;margin:12px 0;text-decoration:none" target="_blank" href="https://wa.me/88${esc(ph)}?text=${encodeURIComponent(msg)}">💬 হোয়াটসঅ্যাপে পাঠান</a>
+    <p class="s">এই পিন শুধু এখানেই দেখা যাচ্ছে — এখনই পাঠিয়ে দিন। ইউজার ঢুকলে অ্যাপ তাকে নিজের পিন বানাতে বলবে।</p><button class="btn" onclick="closeModal()">বন্ধ করুন</button>`;
+  $('modalBg').style.display='flex'; await load(); draw();
+}
+function closeModal(){ $('modalBg').style.display='none'; }
+async function logout(){ await sb.auth.signOut(); login(); }
+OK ? boot() : login();
+</script>
+</body>
+</html>

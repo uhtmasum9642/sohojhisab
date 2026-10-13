@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="theme-color" content="#f5b400">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>সহজ হিসাব</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<style>
+  :root{
+    --bg:#f7f7f9; --card:#fff; --ink:#20242c; --soft:#6f7785; --line:#e6e8ec;
+    --gold:#f5b400; --gold-grad:linear-gradient(135deg,#ffcd3c,#f5a900);
+    --green:#1aa251; --green-bg:#e5f7ec; --red:#e0342c; --red-bg:#fdeaea;
+    --orange:#e87d00; --orange-bg:#fff0dc; --blue:#2563eb; --blue-bg:#e6eeff;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html{ font-size:18px; }
+  body{ margin:0; background:var(--bg); color:var(--ink); font-family:'Hind Siliguri',sans-serif; font-size:1rem; line-height:1.4; }
+  button{ font-family:inherit; font-size:inherit; color:inherit; cursor:pointer; border:none; }
+  input{ font-family:inherit; font-size:1rem; }
+  #app{ max-width:560px; margin:0 auto; min-height:100vh; padding-bottom:5.5rem; }
+  .hdr{ background:var(--gold-grad); padding:1.1rem 1rem .9rem; border-radius:0 0 1.4rem 1.4rem; box-shadow:0 4px 14px rgba(20,20,25,.08); }
+  .hdr h1{ margin:0; font-size:1.2rem; font-weight:700; }
+  .hdr p{ margin:.15rem 0 0; font-size:.85rem; opacity:.75; }
+  .wrap{ padding:1rem; }
+  .card{ background:var(--card); border:1px solid var(--line); border-radius:1rem; padding:1rem; margin-bottom:.9rem; }
+  .big-money{ text-align:center; }
+  .big-money .lbl{ color:var(--soft); font-size:.95rem; }
+  .big-money .val{ font-size:2.3rem; font-weight:700; line-height:1.15; }
+  .two{ display:grid; grid-template-columns:1fr 1fr; gap:.7rem; }
+  .mini{ background:var(--card); border:1px solid var(--line); border-radius:1rem; padding:.8rem; text-align:center; }
+  .mini .lbl{ color:var(--soft); font-size:.9rem; } .mini .val{ font-size:1.5rem; font-weight:700; }
+  .g{ color:var(--green);} .r{ color:var(--red);} .o{ color:var(--orange);} .b{ color:var(--blue);} .s{ color:var(--soft);}
+  .actions{ display:grid; grid-template-columns:1fr 1fr; gap:.8rem; margin:.9rem 0; }
+  .act{ border-radius:1.1rem; padding:1rem .5rem; min-height:7.2rem; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.2rem; text-align:center; font-weight:700; font-size:1.25rem; box-shadow:0 2px 6px rgba(20,20,25,.06); }
+  .act .ic{ font-size:2.1rem; line-height:1; } .act small{ font-weight:500; font-size:.85rem; opacity:.85; }
+  .act.income{ background:var(--green-bg); color:var(--green);} .act.expense{ background:var(--red-bg); color:var(--red);}
+  .act.lend{ background:var(--orange-bg); color:var(--orange);} .act.borrow{ background:var(--blue-bg); color:var(--blue);}
+  .btn{ width:100%; min-height:3.6rem; border-radius:1rem; font-weight:700; font-size:1.15rem; padding:.7rem 1rem; display:flex; align-items:center; justify-content:center; gap:.5rem; }
+  .btn.primary{ background:var(--green); color:#fff; } .btn.gold{ background:var(--gold-grad); color:var(--ink);} 
+  .btn.ghost{ background:var(--card); border:2px solid var(--line); } .btn.danger{ background:var(--red); color:#fff;} 
+  .btn.sm{ min-height:3rem; font-size:1rem; }
+  .btn:disabled{ opacity:.5; }
+  .sec{ font-size:1.05rem; font-weight:700; margin:1.1rem 0 .6rem; display:flex; justify-content:space-between; align-items:center; }
+  .sec a{ color:var(--soft); font-size:.9rem; font-weight:500; }
+  .row{ display:flex; align-items:center; gap:.7rem; padding:.8rem .2rem; border-bottom:1px solid var(--line); min-height:3.6rem; }
+  .row:last-child{ border-bottom:none; }
+  .row .ico{ font-size:1.5rem; width:2rem; text-align:center; flex:0 0 auto; }
+  .row .mid{ flex:1; min-width:0; } .row .t{ font-weight:600; } .row .n{ color:var(--soft); font-size:.88rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .row .amt{ font-weight:700; font-size:1.1rem; white-space:nowrap; text-align:right; }
+  .nav{ position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:1px solid var(--line); display:flex; justify-content:center; z-index:20; }
+  .nav .in{ display:flex; width:100%; max-width:560px; }
+  .nav button{ flex:1; background:none; padding:.55rem 0 .45rem; font-size:.8rem; color:var(--soft); display:flex; flex-direction:column; align-items:center; gap:.05rem; border-top:3px solid transparent; }
+  .nav button .ic{ font-size:1.5rem; line-height:1.1; } .nav button.on{ color:var(--ink); font-weight:700; border-top-color:var(--gold); background:#fffaf0; }
+  .chips{ display:flex; flex-wrap:wrap; gap:.55rem; }
+  .chip{ background:var(--card); border:2px solid var(--line); border-radius:2rem; padding:.55rem 1rem; font-weight:600; min-height:2.9rem; }
+  .chip.on{ background:var(--gold); border-color:var(--gold); }
+  .field{ width:100%; min-height:3.4rem; border:2px solid var(--line); border-radius:1rem; padding:.6rem .9rem; background:#fff; }
+  .field:focus{ outline:none; border-color:var(--gold); }
+  .back{ background:none; font-size:1.05rem; font-weight:600; padding:.3rem 0; color:var(--ink); }
+  .amount-box{ text-align:center; background:#fff; border:2px solid var(--line); border-radius:1rem; padding:.5rem; margin:.6rem 0; }
+  .amount-box .val{ font-size:2.6rem; font-weight:700; min-height:3.2rem; line-height:1.2; }
+  .pad{ display:grid; grid-template-columns:repeat(3,1fr); gap:.5rem; }
+  .pad button{ background:#fff; border:2px solid var(--line); border-radius:.9rem; min-height:3.6rem; font-size:1.6rem; font-weight:600; }
+  .pad button:active{ background:var(--gold); }
+  .mic{ width:100%; min-height:4.2rem; border-radius:1.2rem; background:var(--ink); color:#fff; font-weight:700; font-size:1.2rem; display:flex; align-items:center; justify-content:center; gap:.6rem; }
+  .mic.on{ background:var(--red); animation:pulse 1s infinite; }
+  @keyframes pulse{ 50%{ opacity:.7; } }
+  .hear{ background:#fff8e1; border:1px dashed var(--gold); border-radius:.9rem; padding:.6rem .8rem; margin-top:.6rem; font-size:.95rem; }
+  .dots{ display:flex; justify-content:center; gap:.8rem; margin:1rem 0; }
+  .dot{ width:1.3rem; height:1.3rem; border-radius:50%; border:2px solid var(--soft); } .dot.f{ background:var(--ink); border-color:var(--ink); }
+  .msg{ text-align:center; padding:.6rem; border-radius:.8rem; margin:.6rem 0; } .msg.err{ background:var(--red-bg); color:var(--red);} .msg.ok{ background:var(--green-bg); color:var(--green);} 
+  .empty{ text-align:center; color:var(--soft); padding:1.5rem 1rem; }
+  .status{ text-align:center; font-size:1.2rem; font-weight:700; padding:1rem; border-radius:1rem; margin-bottom:.9rem; }
+  .status.get{ background:var(--green-bg); color:var(--green);} .status.give{ background:var(--red-bg); color:var(--red);} .status.zero{ background:#eef0f3; color:var(--soft);} 
+  #sheetBg{ position:fixed; inset:0; background:rgba(20,20,25,.5); display:none; align-items:flex-end; justify-content:center; z-index:50; }
+  #sheet{ background:#fff; width:100%; max-width:560px; border-radius:1.4rem 1.4rem 0 0; padding:1.2rem 1rem 1.5rem; max-height:88vh; overflow-y:auto; }
+  #sheet h3{ margin:0 0 .7rem; font-size:1.25rem; } .gap{ display:grid; gap:.6rem; margin-top:.9rem; }
+  #toast{ position:fixed; left:50%; transform:translateX(-50%); bottom:5.8rem; background:var(--ink); color:#fff; border-radius:1rem; padding:.7rem 1rem; z-index:60; display:none; align-items:center; gap:.9rem; max-width:92vw; }
+  #toast button{ background:var(--gold); color:var(--ink); font-weight:700; border-radius:.7rem; padding:.4rem .8rem; }
+  .auth{ padding:2rem 1.2rem; } .auth .logo{ font-size:3.2rem; text-align:center; } .auth h1{ text-align:center; margin:.2rem 0 .3rem; font-size:1.6rem; }
+  .auth p.sub{ text-align:center; color:var(--soft); margin:0 0 1.2rem; }
+  label.l{ display:block; font-weight:600; margin:.8rem 0 .3rem; }
+  .sep{ height:.6rem; }
+  .sync{ position:sticky; top:0; z-index:30; text-align:center; font-size:.85rem; font-weight:600; padding:.45rem .8rem; }
+  .sync.off{ background:#fff3cd; color:#7a5b00; } .sync.ing{ background:#e6eeff; color:var(--blue); } .sync.bad{ background:var(--red-bg); color:var(--red); cursor:pointer; }
+  .pend{ font-size:.8rem; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="sheetBg"><div id="sheet"></div></div>
+<div id="toast"></div>
+<script>
+// ===================== CONFIG =====================
+const CFG = window.SK_CONFIG || {};
+const SUPABASE_URL = CFG.SUPABASE_URL || "";
+const SUPABASE_KEY = CFG.SUPABASE_KEY || "";
+const CONFIG_OK = /^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(SUPABASE_URL) && SUPABASE_KEY.length > 20;
+const sb = supabase.createClient(CONFIG_OK ? SUPABASE_URL : "https://placeholder.supabase.co", CONFIG_OK ? SUPABASE_KEY : "placeholder-key-placeholder");
+const EMAIL_DOMAIN = "khata.app"; // ফোন নাম্বার থেকে ছদ্ম-ইমেইল: 01XXXXXXXXX@khata.app
+
+// ===================== TEXT HELPERS =====================
+const BN_DIGITS = '০১২৩৪৫৬৭৮৯';
+function toBn(s){ return String(s).replace(/[0-9]/g, d=>BN_DIGITS[d]); }
+function toEn(s){ return String(s).replace(/[০-৯]/g, d=>BN_DIGITS.indexOf(d)); }
+function fmtNum(n){
+  n = Math.round((Number(n)||0)*100)/100;
+  const neg = n<0; n = Math.abs(n);
+  let [i, f] = String(n).split('.');
+  if(i.length>3){ const last3 = i.slice(-3); let rest = i.slice(0,-3); rest = rest.replace(/\B(?=(\d{2})+(?!\d))/g, ','); i = rest+','+last3; }
+  return (neg?'-':'')+toBn(i + (f?'.'+f:''));
+}
+const taka = n => fmtNum(n)+' ৳';
+const MONTHS = ['জানুয়ারি','ফেব্রুয়ারি','মার্চ','এপ্রিল','মে','জুন','জুলাই','আগস্ট','সেপ্টেম্বর','অক্টোবর','নভেম্বর','ডিসেম্বর'];
+function localDate(d){ d = d||new Date(); const p=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()); }
+function addDays(ds, n){ const [y,m,d]=ds.split('-').map(Number); return localDate(new Date(y,m-1,d+n)); }
+function niceDate(ds){
+  const t = localDate();
+  if(ds===t) return 'আজ'; if(ds===addDays(t,-1)) return 'গতকাল';
+  const [y,m,d]=ds.split('-').map(Number); return toBn(d)+' '+MONTHS[m-1];
+}
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+
+// ===================== BANGLA NUMBER PARSER (voice) =====================
+/*PARSER_START*/
+const UNIT_WORDS = (()=>{
+  const L = [
+    ['শূন্য'],['এক'],['দুই','দুই'],['তিন'],['চার'],['পাঁচ','পাচ'],['ছয়','ছয়'],['সাত'],['আট'],['নয়','নয়'],
+    ['দশ'],['এগারো','এগার'],['বারো','বার'],['তেরো','তের'],['চৌদ্দ','চোদ্দ'],['পনেরো','পনের'],['ষোল','ষোলো'],['সতেরো','সতের'],['আঠারো','আঠার'],['উনিশ','ঊনিশ'],
+    ['বিশ'],['একুশ'],['বাইশ'],['তেইশ'],['চব্বিশ','চব্বিস'],['পঁচিশ','পচিশ'],['ছাব্বিশ','ছাব্বিস'],['সাতাশ','সাতাস'],['আটাশ','আটাস'],['ঊনত্রিশ','উনত্রিশ','উনত্রিস'],
+    ['ত্রিশ','তিরিশ','ত্রিস'],['একত্রিশ'],['বত্রিশ'],['তেত্রিশ'],['চৌত্রিশ'],['পঁয়ত্রিশ','পয়ত্রিশ'],['ছত্রিশ'],['সাঁইত্রিশ','সাইত্রিশ'],['আটত্রিশ'],['ঊনচল্লিশ','উনচল্লিশ'],
+    ['চল্লিশ'],['একচল্লিশ'],['বিয়াল্লিশ'],['তেতাল্লিশ'],['চুয়াল্লিশ'],['পঁয়তাল্লিশ','পয়তাল্লিশ'],['ছেচল্লিশ'],['সাতচল্লিশ'],['আটচল্লিশ'],['ঊনপঞ্চাশ','উনপঞ্চাশ'],
+    ['পঞ্চাশ'],['একান্ন'],['বাহান্ন'],['তিপ্পান্ন'],['চুয়ান্ন'],['পঞ্চান্ন'],['ছাপ্পান্ন'],['সাতান্ন'],['আটান্ন'],['ঊনষাট','উনষাট'],
+    ['ষাট'],['একষট্টি'],['বাষট্টি'],['তেষট্টি'],['চৌষট্টি'],['পঁয়ষট্টি','পয়ষট্টি'],['ছেষট্টি'],['সাতষট্টি'],['আটষট্টি'],['ঊনসত্তর','উনসত্তর'],
+    ['সত্তর'],['একাত্তর'],['বাহাত্তর'],['তিয়াত্তর'],['চুয়াত্তর'],['পঁচাত্তর','পচাত্তর'],['ছিয়াত্তর'],['সাতাত্তর'],['আটাত্তর'],['ঊনআশি','উনআশি'],
+    ['আশি'],['একাশি'],['বিরাশি'],['তিরাশি'],['চুরাশি'],['পঁচাশি','পচাশি'],['ছিয়াশি'],['সাতাশি'],['আটাশি'],['ঊননব্বই','উননব্বই'],
+    ['নব্বই'],['একানব্বই'],['বিরানব্বই'],['তিরানব্বই'],['চুরানব্বই'],['পঁচানব্বই','পচানব্বই'],['ছিয়ানব্বই'],['সাতানব্বই'],['আটানব্বই'],['নিরানব্বই','নিরানব্বই']
+  ];
+  const m = {}; L.forEach((arr,i)=>arr.forEach(w=>{ m[w]=i; })); return m;
+})();
+const MULT_WORDS = { 'শ':100, 'শো':100, 'শত':100, 'হাজার':1000, 'হাজা':1000, 'লাখ':100000, 'লক্ষ':100000, 'লাক':100000, 'কোটি':10000000 };
+const SKIP_WORDS = new Set(['টাকা','টাকার','টা','টাকায়','টাকাই','তাকা']);
+
+function tokenizeSpeech(text){
+  let s = toEn(String(text||'')).replace(/[,।.!?]/g,' ').replace(/(\d)\s*(টাকা)/g,'$1 $2');
+  let raw = s.split(/\s+/).filter(Boolean), out = [];
+  raw.forEach(tok=>{
+    if(UNIT_WORDS[tok]!==undefined || MULT_WORDS[tok]!==undefined || /^\d+(\.\d+)?$/.test(tok) || tok==='দেড়' || tok==='দেড়' || tok==='আড়াই' || tok==='সাড়ে'){ out.push(tok); return; }
+    // যুক্ত শব্দ: পাঁচশ, দুইশো, তিনহাজার ...
+    for(const mw of ['কোটি','লাখ','লক্ষ','হাজার','শো','শত','শ']){
+      if(tok.length>mw.length && tok.endsWith(mw)){
+        const pre = tok.slice(0, -mw.length);
+        if(UNIT_WORDS[pre]!==undefined || /^\d+$/.test(pre) || pre==='দেড়' || pre==='আড়াই'){ out.push(pre, mw); return; }
+      }
+    }
+    out.push(tok);
+  });
+  return out;
+}
+function isNumTok(t){ return UNIT_WORDS[t]!==undefined || MULT_WORDS[t]!==undefined || /^\d+(\.\d+)?$/.test(t) || t==='দেড়' || t==='আড়াই' || t==='সাড়ে'; }
+
+// "পঞ্চাশ টাকা চা খেলাম" -> { amount:50, note:"চা খেলাম" }
+function parseSpeech(text){
+  const toks = tokenizeSpeech(text);
+  let start=-1, end=-1;
+  for(let i=0;i<toks.length;i++){
+    if(isNumTok(toks[i])){ if(start<0) start=i; end=i; }
+    else if(start>=0) break;
+  }
+  const rest = toks.filter((t,i)=> !(start>=0 && i>=start && i<=end) && !SKIP_WORDS.has(t)).join(' ').trim();
+  if(start<0) return { amount:0, note:rest };
+  let total=0, cur=0, sade=false, any=false;
+  for(let i=start;i<=end;i++){
+    const t = toks[i];
+    if(t==='সাড়ে'){ sade=true; continue; }
+    let v = null;
+    if(t==='দেড়') v=1.5; else if(t==='আড়াই') v=2.5;
+    else if(/^\d+(\.\d+)?$/.test(t)) v=parseFloat(t);
+    else if(UNIT_WORDS[t]!==undefined) v=UNIT_WORDS[t];
+    if(v!==null){ if(sade){ v+=0.5; sade=false; } cur += v; any=true; continue; }
+    const m = MULT_WORDS[t];
+    if(m){ any=true; if(m===100){ cur = (cur||1)*100; } else { total += (cur||1)*m; cur=0; } }
+  }
+  return { amount: any ? Math.round((total+cur)*100)/100 : 0, note: rest };
+}
+/*PARSER_END*/
+
+// ===================== STATE =====================
+const S = {
+  user:null, profile:null, cfg:null, accounts:[], account:null, contacts:[], txns:[], trash:[],
+  screen:'home', params:{}, loaded:false, expired:false,
+  authMode:'login', authStep:'phone', authPhone:'', authName:'', pin:'', pinFirst:'',
+};
+const E = { type:null, amount:'', note:'', contactId:null, adding:false, newName:'', fromPerson:false, listening:false, heard:'' };
+const TYPE = {
+  income:     { label:'আয়',          sub:'টাকা পেলাম',            icon:'💰', cls:'income',  color:'g', person:false },
+  expense:    { label:'খরচ',          sub:'টাকা খরচ করলাম',        icon:'🛒', cls:'expense', color:'r', person:false },
+  receivable: { label:'ধার দিলাম',    sub:'কাউকে ধার দিলাম',       icon:'🤲', cls:'lend',    color:'o', person:true },
+  payable:    { label:'ধার নিলাম',    sub:'কারো থেকে ধার নিলাম',   icon:'🙏', cls:'borrow',  color:'b', person:true },
+  receive_due:{ label:'ফেরত পেলাম',   sub:'ধারের টাকা ফেরত পেলাম', icon:'✅', cls:'income',  color:'g', person:true },
+  pay_due:    { label:'ফেরত দিলাম',   sub:'ধারের টাকা ফেরত দিলাম', icon:'↩️', cls:'expense', color:'r', person:true },
+};
+const OLD_LABEL = { sale:'বিক্রি', purchase:'ক্রয়', transfer:'ট্রান্সফার', opening_balance:'শুরুর টাকা' };
+const typeLabel = t => (TYPE[t] && TYPE[t].label) || OLD_LABEL[t] || t;
+const typeIcon  = t => (TYPE[t] && TYPE[t].icon) || (t==='sale'?'💰':t==='purchase'?'🛒':'📒');
+
+// ===================== SMALL UI HELPERS =====================
+const $ = id => document.getElementById(id);
+let toastTimer=null;
+function toast(msg, actLabel, actFn){
+  const t = $('toast'); t.innerHTML = '<span>'+esc(msg)+'</span>'; t.style.display='flex';
+  if(actLabel){ const b=document.createElement('button'); b.textContent=actLabel; b.onclick=()=>{ t.style.display='none'; actFn&&actFn(); }; t.appendChild(b); }
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>{ t.style.display='none'; }, actLabel?7000:2500);
+}
+function openSheet(html){ $('sheet').innerHTML=html; $('sheetBg').style.display='flex'; }
+function closeSheet(){ $('sheetBg').style.display='none'; $('sheet').innerHTML=''; }
+$('sheetBg').addEventListener('click', e=>{ if(e.target.id==='sheetBg' && !S.forced) closeSheet(); });
+function friendlyError(e){
+  const m = String((e&&e.message)||e||'').toLowerCase();
+  if(m.includes('invalid login')) return 'নাম্বার বা পিন ভুল হয়েছে।';
+  if(m.includes('already registered')||m.includes('already been registered')) return 'এই নাম্বারে আগেই অ্যাকাউন্ট আছে। "ঢুকুন" চাপুন।';
+  if(m.includes('rate limit')||m.includes('too many')) return 'অনেকবার চেষ্টা হয়েছে। একটু পরে আবার চেষ্টা করুন।';
+  if(m.includes('failed to fetch')||m.includes('network')) return 'ইন্টারনেট নেই। নেট চালু করে আবার চেষ্টা করুন।';
+  return 'সমস্যা হয়েছে। ইন্টারনেট দেখে আবার চেষ্টা করুন।';
+}
+
+// ===================== BALANCES =====================
+function cashEffect(t){
+  const total=Number(t.total_amount)||0, paid=t.paid_amount!=null?Number(t.paid_amount):total;
+  switch(t.transaction_type){
+    case 'income': case 'payable': case 'receive_due': case 'opening_balance': return total;
+    case 'expense': case 'receivable': case 'pay_due': return -total;
+    case 'sale': return paid; case 'purchase': return -paid;
+    default: return 0;
+  }
+}
+function cashBalance(){
+  let b = S.accounts.reduce((s,a)=>s+(Number(a.opening_balance)||0),0);
+  S.txns.forEach(t=>{ b += cashEffect(t); }); return b;
+}
+function incomeOf(t){ return t.transaction_type==='income' ? Number(t.total_amount)||0 : t.transaction_type==='sale' ? Number(t.paid_amount!=null?t.paid_amount:t.total_amount)||0 : 0; }
+function expenseOf(t){ return t.transaction_type==='expense' ? Number(t.total_amount)||0 : t.transaction_type==='purchase' ? Number(t.paid_amount!=null?t.paid_amount:t.total_amount)||0 : 0; }
+// positive = সে আমাকে দেবে (পাবো), negative = আমি তাকে দেবো (দেবো)
+function personBal(id){
+  const c = S.contacts.find(x=>x.id===id); let bal = c ? (Number(c.opening_balance)||0) : 0;
+  S.txns.filter(t=>t.contact_id===id).forEach(t=>{
+    const total=Number(t.total_amount)||0, due=t.due_amount!=null?Number(t.due_amount):0;
+    if(t.transaction_type==='sale') bal+=due; else if(t.transaction_type==='purchase') bal-=due;
+    else if(t.transaction_type==='receivable') bal+=total; else if(t.transaction_type==='payable') bal-=total;
+    else if(t.transaction_type==='receive_due') bal-=total; else if(t.transaction_type==='pay_due') bal+=total;
+  });
+  return Math.round(bal*100)/100;
+}
+function totals(){
+  let get=0, give=0; S.contacts.forEach(c=>{ const b=personBal(c.id); if(b>0) get+=b; else if(b<0) give+=-b; });
+  return { get, give };
+}
+const personName = id => { const c=S.contacts.find(x=>x.id===id); return c? c.contact_name : ''; };
+
+// ===================== DATA + OFFLINE QUEUE =====================
+let Q = [];       // ফোনে জমা, কিন্তু সার্ভারে এখনো যায়নি এমন কাজ (ক্রমানুসারে)
+let FAILED = [];  // সার্ভার যেগুলো নিতে পারেনি (ডাটা হারায় না, সেটিংয়ে দেখা যায়)
+const keyOf = (n,uid)=>'sk_'+n+'_'+(uid||(S.user&&S.user.id));
+function readJson(k,d){ try{ const j=localStorage.getItem(k); return j?JSON.parse(j):d; }catch(e){ return d; } }
+function writeJson(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); return true; }catch(e){ return false; } }
+function saveCache(){ if(!S.user) return; writeJson(keyOf('cache'), { accounts:S.accounts, account:S.account, contacts:S.contacts, txns:S.txns, trash:S.trash, profile:S.profile, cfg:S.cfg }); }
+function saveQueue(){ if(!S.user) return; const a=writeJson(keyOf('queue'),Q), b=writeJson(keyOf('failed'),FAILED); if(!a||!b) toast('ফোনের জায়গা শেষ! কিছু জায়গা খালি করুন।'); }
+function computeExpired(){ const p=S.profile; return !!(p && !p.is_admin && p.access_expires_at && new Date(p.access_expires_at).getTime() < Date.now()); }
+function applyCache(c){ S.accounts=c.accounts||[]; S.account=c.account||S.accounts[0]||null; S.contacts=c.contacts||[]; S.txns=c.txns||[]; S.trash=c.trash||[]; S.profile=c.profile||null; S.cfg=c.cfg||null; S.expired=computeExpired(); }
+const tmpId = ()=> 'tmp_'+((window.crypto&&crypto.randomUUID)?crypto.randomUUID():Date.now()+'_'+Math.random().toString(36).slice(2));
+function isNetErr(e){ const m=String((e&&e.message)||e||''); return !navigator.onLine || /fetch|network|load failed|timeout|abort|jwt|token|401/i.test(m); }
+
+async function loadAll(){
+  const uid = S.user.id;
+  const [ac, ct, tx, tr, pr, cf] = await Promise.all([
+    sb.from('accounts').select('*').order('created_at'),
+    sb.from('contacts').select('*').order('contact_name'),
+    sb.from('transactions').select('*').eq('user_id',uid).is('deleted_at',null).order('transaction_date',{ascending:false}).order('created_at',{ascending:false}),
+    sb.from('transactions').select('*').eq('user_id',uid).not('deleted_at','is',null).order('deleted_at',{ascending:false}).limit(100),
+    sb.from('profiles').select('*').eq('id',uid).maybeSingle(),
+    sb.from('app_config').select('*').eq('id',1).maybeSingle(),
+  ]);
+  if(ac.error||ct.error||tx.error) throw (ac.error||ct.error||tx.error);
+  S.accounts = (ac.data||[]).filter(a=>a.is_active!==false);
+  S.contacts = (ct.data||[]).filter(c=>c.is_active!==false);
+  S.txns = tx.data||[]; S.trash = tr.data||[];
+  if(!pr.error) S.profile = pr.data||null;
+  if(!cf.error) S.cfg = cf.data||null;
+  S.account = S.accounts.find(a=>a.is_default) || S.accounts[0] || null;
+  if(!S.account){
+    const { data, error } = await sb.from('accounts').insert({ user_id:uid, account_name:'হাতের টাকা', account_type:'cash', opening_balance:0, current_balance:0, is_default:true }).select();
+    if(error) throw error; S.account = data[0]; S.accounts=[S.account];
+  }
+  S.expired = computeExpired();
+  S.loaded = true;
+  saveCache();
+  sb.from('profiles').update({ last_active_at:new Date().toISOString() }).eq('id',uid).then(()=>{},()=>{});
+}
+function userName(){ return (S.profile && S.profile.full_name) || (S.user && S.user.user_metadata && S.user.user_metadata.full_name) || ''; }
+
+// ---- ফোনে আগে সেভ, পরে সার্ভারে (যেকোনো পরিবর্তন এই পথে) ----
+function enqueue(op){
+  op.at = op.at || new Date().toISOString();
+  Q.push(op); saveQueue(); saveCache(); updateSyncUi(); trySync();
+}
+async function createPerson(name, phone){
+  const c = { id:tmpId(), user_id:S.user.id, contact_name:name.trim(), contact_type:'personal', opening_balance:0, phone:phone||null, is_active:true, _pending:true };
+  S.contacts.push(c); S.contacts.sort((a,b)=>a.contact_name.localeCompare(b.contact_name,'bn'));
+  enqueue({ op:'addContact', id:c.id, data:{ contact_name:c.contact_name, contact_type:'personal', opening_balance:0, phone:c.phone } });
+  return c;
+}
+async function saveTxn(type, amount, contactId, note){
+  const data = { transaction_no:'TXN-'+Date.now()+'-'+Math.floor(Math.random()*1000), transaction_date:localDate(), transaction_type:type, status:'completed',
+    account_id:S.account.id, contact_id:contactId||null, total_amount:amount, paid_amount:amount, due_amount:0, notes:note||null };
+  const t = Object.assign({ id:tmpId(), user_id:S.user.id, created_at:new Date().toISOString(), deleted_at:null, _pending:true }, data);
+  S.txns.unshift(t);
+  enqueue({ op:'addTxn', id:t.id, data });
+  return t;
+}
+async function softDelete(id){
+  const i=S.txns.findIndex(t=>t.id===id); if(i<0) return;
+  const t=S.txns.splice(i,1)[0]; t.deleted_at=new Date().toISOString(); S.trash.unshift(t);
+  enqueue({ op:'delTxn', id, at:t.deleted_at });
+}
+async function restoreTxn(id){
+  const i=S.trash.findIndex(t=>t.id===id); if(i<0) return;
+  const t=S.trash.splice(i,1)[0]; t.deleted_at=null; S.txns.push(t);
+  S.txns.sort((a,b)=> (b.transaction_date+(b.created_at||'')).localeCompare(a.transaction_date+(a.created_at||'')));
+  enqueue({ op:'restoreTxn', id });
+}
+function updContact(id, patch){
+  const c=S.contacts.find(x=>x.id===id); if(c) Object.assign(c, patch);
+  enqueue({ op:'updContact', id, patch });
+}
+
+// ---- সার্ভারে জমা (নেট এলে নিজে নিজে) ----
+function remap(tmp, real, row){
+  S.contacts.forEach((c,i)=>{ if(c.id===tmp){ S.contacts[i]=Object.assign({}, c, row||{}, {id:real}); delete S.contacts[i]._pending; } });
+  [S.txns, S.trash].forEach(arr=>arr.forEach((t,i)=>{
+    if(t.id===tmp){ arr[i]=Object.assign({}, t, row||{}, {id:real, deleted_at:t.deleted_at||null}); delete arr[i]._pending; }
+    if(arr[i].contact_id===tmp) arr[i].contact_id=real;
+  }));
+  Q.concat(FAILED).forEach(o=>{ if(o.id===tmp) o.id=real; if(o.data && o.data.contact_id===tmp) o.data.contact_id=real; });
+  if(E.contactId===tmp) E.contactId=real;
+  if(S.params && S.params.id===tmp) S.params.id=real;
+}
+async function runOp(op){
+  const uid=S.user.id;
+  if(op.op==='addContact'){
+    const { data, error } = await sb.from('contacts').insert(Object.assign({ user_id:uid }, op.data)).select();
+    if(error) throw error; remap(op.id, data[0].id, data[0]);
+  } else if(op.op==='addTxn'){
+    const ex = await sb.from('transactions').select('*').eq('transaction_no', op.data.transaction_no).maybeSingle();
+    if(ex.error) throw ex.error;
+    let row = ex.data;  // আগের চেষ্টায় সার্ভারে পৌঁছে গিয়ে থাকলে দ্বিতীয়বার বানাবো না
+    if(!row){ const { data, error } = await sb.from('transactions').insert(Object.assign({ user_id:uid }, op.data)).select(); if(error) throw error; row=data[0]; }
+    remap(op.id, row.id, row);
+  } else if(op.op==='delTxn'){
+    const { error } = await sb.from('transactions').update({ deleted_at:op.at }).eq('id',op.id); if(error) throw error;
+  } else if(op.op==='restoreTxn'){
+    const { error } = await sb.from('transactions').update({ deleted_at:null }).eq('id',op.id); if(error) throw error;
+  } else if(op.op==='updContact'){
+    const { error } = await sb.from('contacts').update(op.patch).eq('id',op.id); if(error) throw error;
+  }
+}
+let syncing=false;
+async function sync(opts){
+  if(syncing || !S.user || !Q.length || !navigator.onLine) return false;
+  syncing=true; S.syncing=true; updateSyncUi();
+  let ok=true, done=0;
+  try{
+    while(Q.length){
+      const op=Q[0];
+      try{ await runOp(op); Q.shift(); done++; saveQueue(); saveCache(); }
+      catch(e){
+        if(isNetErr(e)){ ok=false; break; }
+        Q.shift(); op.err=String((e&&e.message)||e).slice(0,140); FAILED.push(op); saveQueue();
+      }
+    }
+  } finally { syncing=false; S.syncing=false; }
+  updateSyncUi();
+  if(ok && done && !(opts&&opts.refresh===false)){
+    if(!Q.length && $('sheetBg').style.display!=='flex' && S.screen!=='entry'){ try{ await loadAll(); }catch(e){} render(); }
+    toast('☁️ সব হিসাব জমা হয়েছে ✔');
+  }
+  return ok;
+}
+function trySync(){ if(navigator.onLine) sync(); }
+function describeOp(o){
+  if(o.op==='addTxn') return (TYPE[o.data.transaction_type]?TYPE[o.data.transaction_type].label:'এন্ট্রি')+' '+taka(o.data.total_amount)+(o.data.notes?' ('+o.data.notes+')':'');
+  if(o.op==='addContact') return 'নতুন মানুষ: '+o.data.contact_name;
+  if(o.op==='updContact') return 'মানুষের তথ্য বদল';
+  return o.op==='delTxn'?'এন্ট্রি মোছা':'এন্ট্রি ফেরত আনা';
+}
+function syncBarHtml(){
+  const n=Q.length, f=FAILED.length;
+  if(f) return `<div class="sync bad" data-act="nav" data-arg="settings">⚠️ ${toBn(f)}টা কাজ জমা হয়নি — এখানে চাপ দিয়ে দেখুন</div>`;
+  if(!navigator.onLine) return `<div class="sync off">📴 নেট নেই — আপনি লিখতে পারবেন, নেট এলে নিজে জমা হবে${n?' ('+toBn(n)+'টা অপেক্ষায়)':''}</div>`;
+  if(S.syncing) return '<div class="sync ing">🔄 জমা হচ্ছে...</div>';
+  if(n) return `<div class="sync ing">⏳ ${toBn(n)}টা কাজ জমা হবে</div>`;
+  return '';
+}
+function updateSyncUi(){ const el=$('syncBar'); if(el) el.innerHTML=syncBarHtml(); }
+window.addEventListener('online', ()=>{ updateSyncUi(); trySync(); });
+window.addEventListener('offline', updateSyncUi);
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) trySync(); });
+setInterval(()=>{ if(Q.length) trySync(); }, 30000);
+
+// ===================== AUTH SCREENS =====================
+function authHtml(){
+  const signup = S.authMode==='signup';
+  if(S.authStep==='forgot'){
+    return `<div class="auth"><div class="logo">🔑</div><h1>পিন ভুলে গেছেন?</h1><p class="sub">মোবাইল নাম্বার দিন। অ্যাডমিনকে জানানো হবে, তিনি আপনাকে নতুন পিন পাঠিয়ে দেবেন।</p>
+      <label class="l">মোবাইল নাম্বার</label><input class="field" id="authPhone" type="tel" inputmode="numeric" maxlength="14" placeholder="০১XXXXXXXXX" value="${esc(S.authPhone||lsGet('sk_phone')||'')}">
+      <div id="authMsg"></div><button class="btn gold" data-act="forgotSend" style="margin-top:1rem">📨 নতুন পিনের অনুরোধ পাঠান</button><div class="sep"></div><button class="back" data-act="authBack">← ফিরে যান</button></div>`;
+  }
+  if(S.authStep==='phone'){
+    return `<div class="auth">
+      <div class="logo">📒</div><h1>সহজ হিসাব</h1><p class="sub">${signup?'নতুন অ্যাকাউন্ট খুলুন':'আপনার খাতায় ঢুকুন'}</p>
+      ${signup?`<label class="l">আপনার নাম</label><input class="field" id="authName" placeholder="যেমন: রহিম মিয়া" value="${esc(S.authName)}" autocomplete="name">`:''}
+      <label class="l">মোবাইল নাম্বার</label>
+      <input class="field" id="authPhone" type="tel" inputmode="numeric" maxlength="14" placeholder="০১XXXXXXXXX" value="${esc(S.authPhone||lsGet('sk_phone')||'')}" autocomplete="tel">
+      <div id="authMsg"></div>
+      <button class="btn gold" data-act="authNext" style="margin-top:1rem">পরের ধাপ →</button>
+      <div class="sep"></div>
+      <button class="btn ghost sm" data-act="authMode">${signup?'আগে থেকে অ্যাকাউন্ট আছে? ঢুকুন':'নতুন? অ্যাকাউন্ট খুলুন'}</button>
+      ${signup?'':'<button class="back" data-act="forgot" style="margin-top:1rem;width:100%;text-align:center">🔑 পিন ভুলে গেছি</button>'}
+    </div>`;
+  }
+  const title = S.authStep==='pin2' ? 'আবার সেই পিনটা দিন' : signup ? 'একটা ৬ সংখ্যার পিন বানান' : 'আপনার ৬ সংখ্যার পিন দিন';
+  return `<div class="auth">
+    <div class="logo">🔒</div><h1>${title}</h1><p class="sub">${toBn(esc(S.authPhone))}</p>
+    <div class="dots" id="dots">${dotsHtml()}</div>
+    <div id="authMsg"></div>
+    ${padHtml('pin')}
+    <div class="sep"></div><button class="back" data-act="authBack">← নাম্বার বদলান</button>
+    ${signup?'<p class="sub" style="margin-top:1rem">পিনটা মনে রাখুন। অন্য কাউকে বলবেন না।</p>':'<p class="sub" style="margin-top:1rem">পিন ভুলে গেলে যিনি অ্যাপ দিয়েছেন তার সাথে কথা বলুন।</p>'}
+  </div>`;
+}
+function dotsHtml(){ let h=''; for(let i=0;i<6;i++) h+='<div class="dot '+(i<S.pin.length?'f':'')+'"></div>'; return h; }
+function padHtml(act){
+  let h='<div class="pad">';
+  for(let i=1;i<=9;i++) h+=`<button data-act="${act}" data-arg="${i}">${toBn(i)}</button>`;
+  h += act==='amt' ? `<button data-act="amt" data-arg="00">০০</button>` : '<span></span>';
+  h += `<button data-act="${act}" data-arg="0">০</button><button data-act="${act}" data-arg="del">⌫</button></div>`;
+  return h;
+}
+function authMsg(text, cls){ const el=$('authMsg'); if(el) el.innerHTML = text?`<div class="msg ${cls||'err'}">${esc(text)}</div>`:''; }
+function updateDots(){ const d=$('dots'); if(d) d.innerHTML=dotsHtml(); }
+function pinKey(k){
+  if(S.busy) return;
+  if(k==='del') S.pin=S.pin.slice(0,-1); else if(S.pin.length<6) S.pin+=k;
+  updateDots(); if(S.pin.length===6) setTimeout(pinDone,120);
+}
+async function pinDone(){
+  if(S.pinMode==='change') return changePinStep();
+  const signup = S.authMode==='signup';
+  if(S.authStep==='pin' && signup){ S.pinFirst=S.pin; S.pin=''; S.authStep='pin2'; render(); return; }
+  if(S.authStep==='pin2'){ if(S.pin!==S.pinFirst){ S.pin=''; S.pinFirst=''; S.authStep='pin'; render(); authMsg('দুটো পিন মেলেনি। আবার চেষ্টা করুন।'); return; } }
+  S.busy=true; authMsg('অপেক্ষা করুন...','ok');
+  const email = S.authPhone+'@'+EMAIL_DOMAIN;
+  try{
+    if(signup){
+      const { data, error } = await sb.auth.signUp({ email, password:S.pin, options:{ data:{ full_name:S.authName } } });
+      if(error) throw error;
+      if(!data.session){
+        const r = await sb.auth.signInWithPassword({ email, password:S.pin });
+        if(r.error) throw new Error('verify');
+      }
+    } else {
+      const { error } = await sb.auth.signInWithPassword({ email, password:S.pin });
+      if(error) throw error;
+    }
+    lsSet('sk_phone', S.authPhone);
+  }catch(e){
+    S.pin=''; if(signup){ S.pinFirst=''; S.authStep='pin'; render(); }
+    else updateDots();
+    authMsg(String(e&&e.message)==='verify' ? 'অ্যাকাউন্ট তৈরি হয়েছে, কিন্তু এখনো চালু হয়নি। অ্যাপের মালিককে জানান।' : friendlyError(e));
+  }
+  S.busy=false;
+}
+function authNext(){
+  const phone = toEn(($('authPhone').value||'').replace(/[\s-]/g,'')).replace(/^\+?88/,'');
+  if($('authName')){ S.authName = $('authName').value.trim(); if(!S.authName){ authMsg('আপনার নাম লিখুন।'); return; } }
+  if(!/^01[3-9]\d{8}$/.test(phone)){ authMsg('সঠিক ১১ সংখ্যার মোবাইল নাম্বার লিখুন (যেমন ০১৭১২৩৪৫৬৭৮)।'); return; }
+  S.authPhone = phone; S.pin=''; S.pinFirst=''; S.authStep='pin'; render();
+}
+
+async function forgotSend(){
+  const phone = toEn(($('authPhone').value||'').replace(/[\s-]/g,'')).replace(/^\+?88/,'');
+  if(!/^01[3-9]\d{8}$/.test(phone)){ authMsg('সঠিক ১১ সংখ্যার মোবাইল নাম্বার লিখুন।'); return; }
+  S.authPhone=phone; authMsg('অপেক্ষা করুন...','ok');
+  try{
+    const { error } = await sb.from('pin_reset_requests').insert({ phone });
+    if(error && error.code!=='23505') throw error;   // 23505 = আগেই অনুরোধ করা আছে
+    let wa='';
+    try{ const c=await sb.from('app_config').select('contact_whatsapp').eq('id',1).maybeSingle(); const n=c.data&&c.data.contact_whatsapp?String(c.data.contact_whatsapp).replace(/[^0-9]/g,''):''; if(n) wa=`<a class="btn primary" style="text-decoration:none;margin-top:.6rem" target="_blank" href="https://wa.me/${n}?text=${encodeURIComponent('আমার সহজ হিসাব অ্যাপের পিন ভুলে গেছি। আমার নাম্বার: '+phone)}">💬 হোয়াটসঅ্যাপে জানান</a>`; }catch(e){}
+    $('authMsg').innerHTML=`<div class="msg ok">✔ অনুরোধ পাঠানো হয়েছে। অ্যাডমিন নতুন পিন পাঠালে সেই পিন দিয়ে ঢুকুন — ঢোকার পর নিজের পছন্দের পিন বানিয়ে নেবেন।</div>${wa}`;
+  }catch(e){ authMsg(isNetErr(e)?'ইন্টারনেট নেই। নেট চালু করে আবার চেষ্টা করুন।':'অনুরোধ পাঠানো যায়নি। যিনি অ্যাপ দিয়েছেন তাকে ফোন করুন।'); }
+}
+
+function expiredHtml(){
+  const c = S.cfg||{};
+  return `<div class="auth"><div class="logo">⏰</div><h1>আপনার মেয়াদ শেষ</h1><p class="sub">চালিয়ে যেতে যোগাযোগ করুন</p>
+    ${c.contact_phone?`<a class="btn gold" style="text-decoration:none;margin-bottom:.6rem" href="tel:${esc(c.contact_phone)}">📞 ${toBn(esc(c.contact_phone))}</a>`:''}
+    ${c.contact_whatsapp?`<a class="btn primary" style="text-decoration:none;margin-bottom:.6rem" href="https://wa.me/${esc(String(c.contact_whatsapp).replace(/[^0-9]/g,''))}" target="_blank">💬 হোয়াটসঅ্যাপ</a>`:''}
+    ${c.payment_instructions?`<div class="card">${esc(c.payment_instructions)}</div>`:''}
+    <button class="btn ghost sm" data-act="logout2">লগআউট</button></div>`;
+}
+
+// ===================== SCREENS =====================
+function navHtml(){
+  const items=[['home','🏠','হোম'],['people','👥','মানুষ'],['history','📒','হিসাব'],['settings','⚙️','সেটিং']];
+  const cur = S.screen==='person'?'people':S.screen==='trash'?'history':S.screen;
+  return '<div class="nav"><div class="in">'+items.map(([k,i,l])=>`<button class="${cur===k?'on':''}" data-act="nav" data-arg="${k}"><span class="ic">${i}</span>${l}</button>`).join('')+'</div></div>';
+}
+function txnRowHtml(t, showPerson){
+  const col = {income:'g',sale:'g',receive_due:'g',expense:'r',purchase:'r',pay_due:'r',receivable:'o',payable:'b'}[t.transaction_type]||'';
+  const nm = t.contact_id ? personName(t.contact_id) : '';
+  return `<div class="row" data-act="txn" data-arg="${t.id}"><div class="ico">${typeIcon(t.transaction_type)}</div>
+    <div class="mid"><div class="t">${esc(typeLabel(t.transaction_type))}${showPerson&&nm?' — '+esc(nm):''}${t._pending?' <span class="pend">⏳</span>':''}</div>${t.notes?`<div class="n">${esc(t.notes)}</div>`:''}</div>
+    <div class="amt ${col}">${taka(t.total_amount)}</div></div>`;
+}
+function homeHtml(){
+  const today=localDate(), tt=S.txns.filter(t=>t.transaction_date===today);
+  const inc=tt.reduce((s,t)=>s+incomeOf(t),0), exp=tt.reduce((s,t)=>s+expenseOf(t),0);
+  const { get, give } = totals(), cash=cashBalance();
+  const nm = userName();
+  const acts = ['income','expense','receivable','payable'].map(k=>`<button class="act ${TYPE[k].cls}" data-act="entry" data-arg="${k}"><span class="ic">${TYPE[k].icon}</span>${TYPE[k].label}<small>${TYPE[k].sub}</small></button>`).join('');
+  return `<div class="hdr"><h1>📒 সহজ হিসাব</h1><p>${nm?'স্বাগতম, '+esc(nm):'আপনার খাতা'} · ${niceDate(today)}</p></div>
+  <div class="wrap">
+    <div class="card big-money"><div class="lbl">হাতে আছে</div><div class="val ${cash<0?'r':''}">${taka(cash)}</div></div>
+    <div class="two"><div class="mini"><div class="lbl">আজ আয়</div><div class="val g">${taka(inc)}</div></div><div class="mini"><div class="lbl">আজ খরচ</div><div class="val r">${taka(exp)}</div></div></div>
+    <div class="actions">${acts}</div>
+    <div class="two">
+      <button class="mini" data-act="people" data-arg="get"><div class="lbl">আমি পাবো</div><div class="val g">${taka(get)}</div></button>
+      <button class="mini" data-act="people" data-arg="give"><div class="lbl">আমি দেবো</div><div class="val r">${taka(give)}</div></button>
+    </div>
+    <div class="sec">আজকের হিসাব <a data-act="nav" data-arg="history">সব দেখুন ›</a></div>
+    <div class="card" style="padding:.3rem .8rem">${tt.length? tt.slice(0,6).map(t=>txnRowHtml(t,true)).join('') : '<div class="empty">আজ এখনো কিছু লেখা হয়নি।<br>উপরের একটা বাটনে চাপ দিন।</div>'}</div>
+  </div>`;
+}
+function peopleHtml(){
+  const f = S.params.filter||'all';
+  let list = S.contacts.map(c=>({c, b:personBal(c.id)}));
+  if(f==='get') list=list.filter(x=>x.b>0); else if(f==='give') list=list.filter(x=>x.b<0);
+  list.sort((a,b)=>{ const za=a.b===0, zb=b.b===0; if(za!==zb) return za?1:-1; return Math.abs(b.b)-Math.abs(a.b); });
+  const chips = [['all','সবাই'],['get','আমি পাবো'],['give','আমি দেবো']].map(([k,l])=>`<button class="chip ${f===k?'on':''}" data-act="people" data-arg="${k}">${l}</button>`).join('');
+  const rows = list.map(({c,b})=>`<div class="row" data-act="person" data-arg="${c.id}"><div class="ico">👤</div><div class="mid"><div class="t">${esc(c.contact_name)}</div>${c.phone?`<div class="n">${toBn(esc(c.phone))}</div>`:''}</div>
+    <div class="amt ${b>0?'g':b<0?'r':'s'}">${b>0?'পাবো '+taka(b):b<0?'দেবো '+taka(-b):'মিটে গেছে'}</div></div>`).join('');
+  return `<div class="hdr"><h1>👥 মানুষ</h1><p>কার কাছে কত পাবো / কাকে কত দেবো</p></div>
+  <div class="wrap"><div class="chips" style="margin-bottom:.9rem">${chips}</div>
+  <button class="btn gold sm" data-act="newPerson" style="margin-bottom:.9rem">➕ নতুন মানুষ যোগ করুন</button>
+  <div class="card" style="padding:.3rem .8rem">${rows||'<div class="empty">এখানে কেউ নেই।<br>ধার দিলে বা নিলে এখানে নাম আসবে।</div>'}</div></div>`;
+}
+function personHtml(){
+  const c = S.contacts.find(x=>x.id===S.params.id); if(!c) return '<div class="wrap"><button class="back" data-act="nav" data-arg="people">← ফিরুন</button><div class="empty">খুঁজে পাওয়া যায়নি</div></div>';
+  const b = personBal(c.id), nm=esc(c.contact_name);
+  const sentence = b>0 ? `${nm} আপনাকে ${fmtNum(b)} টাকা দেবে` : b<0 ? `আপনি ${nm}-কে ${fmtNum(-b)} টাকা দেবেন` : `${nm}-এর সাথে কোনো বাকি নেই ✔`;
+  const mk=(k,p)=>`<button class="btn ${p?'primary':'ghost'}" data-act="entry" data-arg="${k}" data-person="${c.id}">${TYPE[k].icon} ${TYPE[k].label}</button>`;
+  const btns = b>0 ? mk('receive_due',true)+mk('receivable') : b<0 ? mk('pay_due',true)+mk('payable') : mk('receivable')+mk('payable');
+  const tx = S.txns.filter(t=>t.contact_id===c.id);
+  const ob = Number(c.opening_balance)||0;
+  return `<div class="hdr"><button class="back" data-act="nav" data-arg="people">← ফিরুন</button><h1>👤 ${nm}-এর খাতা</h1>${c.phone?`<p>${toBn(esc(c.phone))}</p>`:''}</div>
+  <div class="wrap"><div class="status ${b>0?'get':b<0?'give':'zero'}">${sentence}</div>
+  <div class="gap" style="margin:0 0 .9rem">${btns}<button class="btn gold sm" data-act="share" data-arg="${c.id}">📤 খাতা পাঠান (হোয়াটসঅ্যাপ)</button></div>
+  <div class="sec">সব হিসাব</div><div class="card" style="padding:.3rem .8rem">
+  ${ob?`<div class="row"><div class="ico">📒</div><div class="mid"><div class="t">আগের বাকি</div></div><div class="amt ${ob>0?'g':'r'}">${taka(Math.abs(ob))}</div></div>`:''}
+  ${tx.length? tx.map(t=>`<div class="row" data-act="txn" data-arg="${t.id}"><div class="ico">${typeIcon(t.transaction_type)}</div><div class="mid"><div class="t">${esc(typeLabel(t.transaction_type))}${t._pending?' <span class="pend">⏳</span>':''}</div><div class="n">${niceDate(t.transaction_date)}${t.notes?' · '+esc(t.notes):''}</div></div><div class="amt ${{receivable:'o',payable:'b',receive_due:'g',pay_due:'r'}[t.transaction_type]||''}">${taka(t.total_amount)}</div></div>`).join('') : (ob?'':'<div class="empty">এখনো কোনো হিসাব নেই</div>')}
+  </div><button class="btn ghost sm" data-act="personMore" data-arg="${c.id}">⋯ আরও (নাম বদলান / মুছুন)</button></div>`;
+}
+function historyHtml(){
+  const r = S.params.range||'today', t=localDate();
+  const inR = d => r==='today' ? d===t : r==='7' ? d>=addDays(t,-6) : r==='month' ? d.slice(0,7)===t.slice(0,7) : true;
+  const list = S.txns.filter(x=>inR(x.transaction_date));
+  const inc=list.reduce((s,x)=>s+incomeOf(x),0), exp=list.reduce((s,x)=>s+expenseOf(x),0);
+  const chips=[['today','আজ'],['7','গত ৭ দিন'],['month','এই মাস'],['all','সব']].map(([k,l])=>`<button class="chip ${r===k?'on':''}" data-act="range" data-arg="${k}">${l}</button>`).join('');
+  let body='', last='';
+  list.forEach(x=>{ if(x.transaction_date!==last){ last=x.transaction_date; body+=`<div class="sec" style="margin:.8rem 0 .2rem;font-size:.95rem;color:var(--soft)">${niceDate(last)}</div>`; } body+=txnRowHtml(x,true); });
+  return `<div class="hdr"><h1>📒 আগের হিসাব</h1><p>আয়-খরচ ও ধারের সব এন্ট্রি</p></div>
+  <div class="wrap"><div class="chips" style="margin-bottom:.9rem">${chips}</div>
+  <div class="two" style="margin-bottom:.5rem"><div class="mini"><div class="lbl">মোট আয়</div><div class="val g">${taka(inc)}</div></div><div class="mini"><div class="lbl">মোট খরচ</div><div class="val r">${taka(exp)}</div></div></div>
+  <div class="mini" style="margin-bottom:.9rem"><div class="lbl">বাঁচল</div><div class="val ${inc-exp<0?'r':'g'}">${taka(inc-exp)}</div></div>
+  <div class="card" style="padding:.3rem .8rem">${body||'<div class="empty">এই সময়ে কোনো হিসাব নেই</div>'}</div>
+  <button class="btn ghost sm" data-act="trash">🗑 মুছে ফেলা হিসাব (${toBn(S.trash.length)})</button></div>`;
+}
+function trashHtml(){
+  return `<div class="hdr"><button class="back" data-act="nav" data-arg="history">← ফিরুন</button><h1>🗑 মুছে ফেলা হিসাব</h1><p>ভুলে মুছে ফেললে এখান থেকে ফেরত আনুন</p></div>
+  <div class="wrap"><div class="card" style="padding:.3rem .8rem">${S.trash.length? S.trash.map(t=>`<div class="row"><div class="ico">${typeIcon(t.transaction_type)}</div><div class="mid"><div class="t">${esc(typeLabel(t.transaction_type))} ${taka(t.total_amount)}</div><div class="n">${niceDate(t.transaction_date)}${t.contact_id?' · '+esc(personName(t.contact_id)):''}${t.notes?' · '+esc(t.notes):''}</div></div><button class="chip on" data-act="restore" data-arg="${t.id}">↩️ ফেরত আনুন</button></div>`).join('') : '<div class="empty">কিছু নেই</div>'}</div></div>`;
+}
+function settingsHtml(){
+  const fs = Number(lsGet('sk_font'))||18;
+  const fb = [[16,'ছোট'],[18,'মাঝারি'],[21,'বড়'],[24,'অনেক বড়']].map(([n,l])=>`<button class="chip ${fs===n?'on':''}" data-act="font" data-arg="${n}">${l}</button>`).join('');
+  return `<div class="hdr"><h1>⚙️ সেটিং</h1><p>${esc(userName())} · ${toBn(esc(S.user.email.split('@')[0]))}</p></div>
+  <div class="wrap"><div class="sec">লেখার সাইজ</div><div class="chips">${fb}</div>
+  <div class="sec">পিন</div><button class="btn ghost" data-act="changePin">🔒 পিন বদলান</button>
+  <div class="sec">সাহায্য</div><div class="card" style="font-size:.95rem">• <b>আয়</b> — টাকা পেলে<br>• <b>খরচ</b> — টাকা খরচ করলে<br>• <b>ধার দিলাম</b> — কাউকে ধার দিলে<br>• <b>ধার নিলাম</b> — কারো থেকে ধার নিলে<br>• <b>ফেরত পেলাম / দিলাম</b> — ধারের টাকা মেটালে (মানুষের নামে চাপ দিয়ে)<br>• ভুল হলে এন্ট্রিতে চাপ দিয়ে <b>মুছে ফেলুন</b>, আবার ফেরত আনা যায়।</div>
+  ${FAILED.length?`<div class="sec">⚠️ জমা হয়নি</div><div class="card" style="font-size:.95rem">${FAILED.map(o=>'• '+esc(describeOp(o))).join('<br>')}<div class="gap"><button class="btn gold sm" data-act="retryFailed">🔄 আবার চেষ্টা করুন</button><button class="btn ghost sm" data-act="dropFailed">🗑 বাদ দিন</button></div></div>`:''}
+  <button class="btn danger" data-act="logout" style="margin-top:1rem">🚪 লগআউট</button></div>`;
+}
+
+// ===================== ENTRY SCREEN =====================
+function micSupported(){ return !!(window.SpeechRecognition||window.webkitSpeechRecognition); }
+function amtText(){ const n=parseFloat(E.amount); return (n>0||E.amount==='0'?fmtNum(n||0):'০')+' ৳'; }
+function candidates(){
+  let l = S.contacts.slice();
+  if(E.type==='receive_due') l=l.filter(c=>personBal(c.id)>0||c.id===E.contactId);
+  if(E.type==='pay_due') l=l.filter(c=>personBal(c.id)<0||c.id===E.contactId);
+  return l;
+}
+function chipsHtml(){
+  const canNew = E.type==='receivable'||E.type==='payable';
+  const l = candidates();
+  let h = l.map(c=>`<button class="chip ${E.contactId===c.id?'on':''}" data-act="pick" data-arg="${c.id}">${esc(c.contact_name)}</button>`).join('');
+  if(canNew) h += `<button class="chip ${E.adding?'on':''}" data-act="pickNew">➕ নতুন মানুষ</button>`;
+  if(!l.length && !canNew) h = '<div class="s">এখন কারো সাথে এমন বাকি নেই।</div>';
+  if(E.adding) h += `<input class="field" id="newName" placeholder="মানুষটির নাম লিখুন" value="${esc(E.newName)}" style="margin-top:.6rem;flex-basis:100%">`;
+  return h;
+}
+function entryHtml(){
+  const T = TYPE[E.type];
+  return `<div class="hdr"><button class="back" data-act="entryBack">← ফিরুন</button><h1>${T.icon} ${T.label}</h1><p>${T.sub}</p></div>
+  <div class="wrap">
+    ${micSupported()?`<button class="mic ${E.listening?'on':''}" id="micBtn" data-act="mic">🎤 ${E.listening?'শুনছি... (থামাতে চাপ দিন)':'বলে লিখুন'}</button><div id="hear"></div>`:'<div class="s" style="text-align:center">এই ফোনে বলে লেখা চলবে না। নিচে টাইপ করুন।</div>'}
+    <div class="amount-box"><div class="s" style="font-size:.9rem">কত টাকা?</div><div class="val ${T.color}" id="amtVal">${amtText()}</div></div>
+    ${padHtml('amt')}
+    ${T.person?`<label class="l">কার সাথে?</label><div class="chips" id="chips">${chipsHtml()}</div>`:''}
+    <label class="l">কী বিষয়? <span class="s">(না লিখলেও চলবে)</span></label>
+    <input class="field" id="note" placeholder="${E.type==='expense'?'যেমন: চাল কিনলাম':E.type==='income'?'যেমন: আজকের মজুরি':'যেমন: চিকিৎসার জন্য'}" value="${esc(E.note)}">
+    <button class="btn primary" data-act="entrySave" style="margin-top:1rem">✔ সেভ করুন</button>
+  </div>`;
+}
+function startEntry(type, pid){
+  Object.assign(E,{ type, amount:'', note:'', contactId:pid||null, adding:false, newName:'', fromPerson:!!pid, listening:false });
+  go('entry');
+}
+function amtKey(k){
+  if(k==='del') E.amount=E.amount.slice(0,-1);
+  else if(E.amount.length<9){ if(!(E.amount===''&&(k==='0'||k==='00'))) E.amount+=k; }
+  const el=$('amtVal'); if(el) el.textContent=amtText();
+}
+function sentenceFor(type, amt, nm, note){
+  const a=fmtNum(amt)+' টাকা';
+  switch(type){
+    case 'income': return a+' আয়'+(note?' — '+note:'');
+    case 'expense': return a+' খরচ'+(note?' — '+note:'');
+    case 'receivable': return nm+'-কে '+a+' ধার দিলাম';
+    case 'payable': return nm+'-এর কাছ থেকে '+a+' ধার নিলাম';
+    case 'receive_due': return nm+'-এর কাছ থেকে '+a+' ফেরত পেলাম';
+    default: return nm+'-কে '+a+' ফেরত দিলাম';
+  }
+}
+function entrySave(){
+  const amt=parseFloat(E.amount); const T=TYPE[E.type];
+  if(!(amt>0)){ toast('আগে টাকার অঙ্ক লিখুন'); return; }
+  if(T.person && !E.contactId && !(E.adding && E.newName.trim())){ toast('কার সাথে? নাম বাছুন'); return; }
+  const nm = E.contactId ? personName(E.contactId) : E.newName.trim();
+  S.sentence = sentenceFor(E.type, amt, nm, E.note);
+  openSheet(`<h3>এটা ঠিক আছে?</h3><div class="card" style="font-size:1.3rem;font-weight:700">${esc(S.sentence)}</div>
+    ${T.person&&E.note?`<div class="s" style="margin-bottom:.4rem">বিষয়: ${esc(E.note)}</div>`:''}
+    <div id="sheetMsg"></div>
+    <div class="gap"><button class="btn primary" id="confirmBtn" data-act="entryConfirm">✔ হ্যাঁ, সেভ করুন</button>
+    <button class="btn ghost sm" data-act="speak">🔊 পড়ে শোনান</button>
+    <button class="btn ghost" data-act="closeSheet">✖ না, ঠিক করব</button></div>`);
+}
+async function entryConfirm(){
+  if(S.saving) return; S.saving=true;
+  const btn=$('confirmBtn'); if(btn){ btn.disabled=true; btn.textContent='সেভ হচ্ছে...'; }
+  try{
+    let cid=E.contactId;
+    if(!cid && E.adding && E.newName.trim()){ const p = await createPerson(E.newName); cid=p.id; }
+    const txn = await saveTxn(E.type, parseFloat(E.amount), cid, E.note.trim());
+    closeSheet();
+    const back = E.fromPerson ? ['person',{id:cid}] : ['home',{}];
+    go(back[0], back[1]);
+    toast('✔ সেভ হয়েছে','ফিরিয়ে নিন', async()=>{ try{ await softDelete(txn.id); render(); toast('ফিরিয়ে নেওয়া হয়েছে'); }catch(e){ toast(friendlyError(e)); } });
+  }catch(e){
+    const m=$('sheetMsg'); if(m) m.innerHTML=`<div class="msg err">${esc(friendlyError(e))}</div>`;
+    if(btn){ btn.disabled=false; btn.textContent='✔ আবার চেষ্টা করুন'; }
+  }
+  S.saving=false;
+}
+
+// ===================== VOICE =====================
+let rec=null;
+function setHear(h){ const el=$('hear'); if(el) el.innerHTML = h?`<div class="hear">${h}</div>`:''; }
+function setMicUi(){ const b=$('micBtn'); if(b){ b.className='mic'+(E.listening?' on':''); b.textContent = E.listening?'🎤 শুনছি... (থামাতে চাপ দিন)':'🎤 বলে লিখুন'; } }
+function startMic(){
+  if(!micSupported()){ toast('এই ফোনে বলে লেখা চলবে না। টাইপ করুন।'); return; }
+  if(E.listening && rec){ try{ rec.stop(); }catch(e){} return; }
+  const SR = window.SpeechRecognition||window.webkitSpeechRecognition;
+  rec = new SR(); rec.lang='bn-BD'; rec.interimResults=true; rec.continuous=false;
+  let heard='';
+  rec.onstart = ()=>{ E.listening=true; setMicUi(); setHear('বলুন... যেমন: <b>পঞ্চাশ টাকা চা খেলাম</b>'); };
+  rec.onresult = ev=>{ let t=''; for(let i=0;i<ev.results.length;i++) t+=ev.results[i][0].transcript; heard=t; setHear('শুনলাম: '+esc(t)); };
+  rec.onerror = ev=>{ E.listening=false; setMicUi();
+    const e=ev.error; setHear(esc(e==='not-allowed'||e==='service-not-allowed'?'মাইক চালু করার অনুমতি দিন (ব্রাউজারের সেটিং থেকে)।':e==='no-speech'?'কিছু শুনতে পাইনি। আবার বলুন।':e==='network'?'ইন্টারনেট ছাড়া বলে লেখা চলে না। টাইপ করুন।':'বলে লেখা কাজ করেনি। টাইপ করুন।')); };
+  rec.onend = ()=>{ E.listening=false; setMicUi(); if(heard) applySpeech(heard); };
+  try{ rec.start(); }catch(e){ E.listening=false; setMicUi(); }
+}
+function applySpeech(text){
+  const r = parseSpeech(text); let note = r.note;
+  const T = TYPE[E.type];
+  if(T.person){
+    if(!E.contactId){ const c = S.contacts.find(c=>text.includes(c.contact_name)); if(c){ E.contactId=c.id; E.adding=false; const ch=$('chips'); if(ch) ch.innerHTML=chipsHtml(); } }
+    const nm = E.contactId?personName(E.contactId):'';
+    if(nm) note = note.split(nm).join(' ');
+    note = note.split(/\s+/).filter(w=>!['কে','কের','এর','র','ধার','দিলাম','নিলাম','ফেরত','পেলাম','কাছ','থেকে','থেকে'].includes(w)).join(' ').trim();
+  }
+  if(r.amount>0){ E.amount=String(r.amount); const el=$('amtVal'); if(el) el.textContent=amtText(); }
+  if(note){ E.note=note; const n=$('note'); if(n) n.value=note; }
+  setHear('শুনলাম: '+esc(text)+'<br><b>'+(r.amount>0?'ঠিক না হলে নিচে ঠিক করে নিন।':'টাকার অঙ্ক বুঝতে পারিনি। নাম্বার-প্যাডে লিখুন।')+'</b>');
+}
+
+// ===================== ACTIONS =====================
+function go(screen, params){ S.screen=screen; S.params=params||{}; render(); window.scrollTo(0,0); }
+function render(){
+  const app=$('app');
+  if(!CONFIG_OK){ app.innerHTML='<div class="auth"><div class="logo">🛠️</div><h1>সেটআপ বাকি</h1><p class="sub">config.js ফাইলে Supabase-এর লিংক ও কী বসানো হয়নি। SETUP.md-এর ধাপ ৭ দেখুন।</p></div>'; return; }
+  if(!S.user){ app.innerHTML=authHtml(); return; }
+  if(S.loadError){ app.innerHTML=`<div class="auth"><div class="logo">📡</div><h1>খাতা খোলা যায়নি</h1><p class="sub">ইন্টারনেট দেখে আবার চেষ্টা করুন</p><button class="btn gold" data-act="retry">🔄 আবার চেষ্টা করুন</button></div>`; return; }
+  if(!S.loaded){ app.innerHTML='<div class="empty" style="padding-top:35vh">অপেক্ষা করুন...</div>'; return; }
+  if(S.expired){ app.innerHTML=expiredHtml(); return; }
+  const f = { home:homeHtml, people:peopleHtml, person:personHtml, history:historyHtml, trash:trashHtml, settings:settingsHtml, entry:entryHtml }[S.screen] || homeHtml;
+  app.innerHTML = '<div id="syncBar">'+syncBarHtml()+'</div>' + f() + (S.screen==='entry'?'':navHtml());
+}
+function shareText(c){
+  const b=personBal(c.id), me=userName()||'আমি';
+  let s='📒 '+c.contact_name+' ও '+me+'-এর হিসাব\n━━━━━━━━━━\n';
+  const tx=S.txns.filter(t=>t.contact_id===c.id).slice().reverse();
+  const ob=Number(c.opening_balance)||0; if(ob) s+='আগের বাকি: '+fmtNum(Math.abs(ob))+' ৳\n';
+  tx.forEach(t=>{ s+=niceDate(t.transaction_date)+' — '+typeLabel(t.transaction_type)+' '+fmtNum(t.total_amount)+' ৳'+(t.notes?' ('+t.notes+')':'')+'\n'; });
+  s+='━━━━━━━━━━\n'+(b>0?c.contact_name+' দেবেন: '+fmtNum(b)+' টাকা':b<0?me+' দেবেন '+c.contact_name+'-কে: '+fmtNum(-b)+' টাকা':'কোনো বাকি নেই ✔');
+  return s;
+}
+const ACT = {
+  nav:(a)=>go(a), people:(a)=>go('people',{filter:a}), person:(a)=>go('person',{id:a}), range:(a)=>go('history',{range:a}), trash:()=>go('trash'),
+  entry:(a,el)=>startEntry(a, el.dataset.person), entryBack:()=>{ if(E.listening&&rec){ try{rec.stop();}catch(e){} } E.fromPerson&&E.contactId ? go('person',{id:E.contactId}) : go('home'); },
+  amt:(a)=>amtKey(a), pin:(a)=>pinKey(a), mic:()=>startMic(), entrySave:()=>entrySave(), entryConfirm:()=>entryConfirm(), closeSheet:()=>closeSheet(),
+  speak:()=>{ try{ speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(S.sentence); u.lang='bn-BD'; speechSynthesis.speak(u); }catch(e){ toast('এই ফোনে পড়ে শোনানো চলবে না'); } },
+  pick:(a)=>{ E.contactId=a; E.adding=false; $('chips').innerHTML=chipsHtml(); },
+  pickNew:()=>{ E.adding=!E.adding; E.contactId=null; $('chips').innerHTML=chipsHtml(); if(E.adding){ const n=$('newName'); n&&n.focus(); } },
+  authNext:()=>authNext(), authMode:()=>{ S.authMode=S.authMode==='login'?'signup':'login'; S.authStep='phone'; render(); },
+  authBack:()=>{ S.authStep='phone'; S.pin=''; S.pinFirst=''; render(); },
+  retry:()=>{ S.loadError=false; S.loaded=false; render(); boot(); },
+  txn:(a)=>{ const t=S.txns.find(x=>x.id===a); if(!t) return;
+    openSheet(`<h3>${typeIcon(t.transaction_type)} ${esc(typeLabel(t.transaction_type))}</h3><div class="card"><div style="font-size:1.6rem;font-weight:700">${taka(t.total_amount)}</div>
+      <div class="s">${niceDate(t.transaction_date)}${t.contact_id?' · '+esc(personName(t.contact_id)):''}</div>${t.notes?`<div>${esc(t.notes)}</div>`:''}</div>
+      <div class="gap"><button class="btn danger" data-act="txnDel" data-arg="${t.id}">🗑 মুছে ফেলুন</button><button class="btn ghost" data-act="closeSheet">বন্ধ করুন</button></div>`); },
+  txnDel:async(a)=>{ try{ await softDelete(a); closeSheet(); render(); toast('মুছে ফেলা হয়েছে','ফিরিয়ে আনুন', async()=>{ try{ await restoreTxn(a); render(); }catch(e){ toast(friendlyError(e)); } }); }catch(e){ toast(friendlyError(e)); } },
+  restore:async(a)=>{ try{ await restoreTxn(a); render(); toast('ফেরত আনা হয়েছে'); }catch(e){ toast(friendlyError(e)); } },
+  newPerson:()=>openSheet(`<h3>➕ নতুন মানুষ</h3><label class="l">নাম</label><input class="field" id="npName" placeholder="যেমন: করিম ভাই"><label class="l">মোবাইল (না দিলেও চলবে)</label><input class="field" id="npPhone" type="tel" inputmode="numeric"><div id="sheetMsg"></div><div class="gap"><button class="btn primary" data-act="newPersonSave">✔ যোগ করুন</button><button class="btn ghost" data-act="closeSheet">বাতিল</button></div>`),
+  newPersonSave:async()=>{ const n=$('npName').value.trim(); if(!n){ $('sheetMsg').innerHTML='<div class="msg err">নাম লিখুন</div>'; return; }
+    try{ const ph=toEn($('npPhone').value.trim()); const p=await createPerson(n, ph); closeSheet(); go('person',{id:p.id}); }catch(e){ $('sheetMsg').innerHTML=`<div class="msg err">${esc(friendlyError(e))}</div>`; } },
+  share:(a)=>{ const c=S.contacts.find(x=>x.id===a); if(!c) return; const text=shareText(c);
+    if(navigator.share){ navigator.share({text}).catch(()=>{}); } else window.open('https://wa.me/?text='+encodeURIComponent(text),'_blank'); },
+  personMore:(a)=>{ const c=S.contacts.find(x=>x.id===a);
+    openSheet(`<h3>👤 ${esc(c.contact_name)}</h3><div class="gap"><button class="btn ghost" data-act="rename" data-arg="${a}">✏️ নাম বদলান</button><button class="btn danger" data-act="delPerson" data-arg="${a}">🗑 এই মানুষকে মুছুন</button><button class="btn ghost" data-act="closeSheet">বন্ধ করুন</button></div>`); },
+  rename:(a)=>{ const c=S.contacts.find(x=>x.id===a); openSheet(`<h3>✏️ নাম বদলান</h3><input class="field" id="rnName" value="${esc(c.contact_name)}"><div id="sheetMsg"></div><div class="gap"><button class="btn primary" data-act="renameSave" data-arg="${a}">✔ সেভ করুন</button><button class="btn ghost" data-act="closeSheet">বাতিল</button></div>`); },
+  renameSave:(a)=>{ const n=$('rnName').value.trim(); if(!n) return; updContact(a,{contact_name:n}); closeSheet(); render(); },
+  delPerson:(a)=>{ if(personBal(a)!==0){ closeSheet(); toast('আগে বাকি মিটিয়ে নিন'); return; }
+    updContact(a,{is_active:false}); S.contacts=S.contacts.filter(x=>x.id!==a); saveCache(); closeSheet(); go('people'); toast('মানুষটি মুছে ফেলা হয়েছে'); },
+  font:(a)=>{ lsSet('sk_font',a); document.documentElement.style.fontSize=a+'px'; render(); },
+  changePin:()=>{ S.pinMode='change'; S.pin=''; S.chg={step:1,first:''}; openSheet(`<h3 id="chgTitle">${S.forced?'আপনার পিন রিসেট হয়েছে — নতুন ৬ সংখ্যার পিন বানান':'নতুন ৬ সংখ্যার পিন দিন'}</h3><div class="dots" id="dots">${dotsHtml()}</div><div id="sheetMsg"></div>${padHtml('pin')}${S.forced?'':'<div class="gap"><button class="btn ghost" data-act="closeChg">বাতিল</button></div>'}`); },
+  closeChg:()=>{ S.pinMode=null; S.pin=''; closeSheet(); },
+  logout:()=>{ const n=Q.length+FAILED.length; openSheet(`<h3>লগআউট করবেন?</h3>${n?`<div class="msg err">⚠️ ফোনে ${toBn(n)}টা কাজ এখনো জমা হয়নি। এখন লগআউট করলে সেগুলো হারিয়ে যাবে। নেট এলে জমা হওয়ার পর লগআউট করুন।</div>`:''}<div class="gap"><button class="btn ghost" data-act="closeSheet">না, থাকি</button><button class="btn danger" data-act="logout2">${n?'তবুও লগআউট':'হ্যাঁ, লগআউট'}</button></div>`); },
+  logout2:async()=>{ closeSheet(); const uid=S.user&&S.user.id; if(uid){ ['cache','queue','failed'].forEach(n=>{ try{ localStorage.removeItem(keyOf(n,uid)); }catch(e){} }); } try{ localStorage.removeItem('sk_user'); }catch(e){} try{ await sb.auth.signOut(); }catch(e){} wipe(); },
+  retryFailed:()=>{ Q=FAILED.concat(Q); FAILED=[]; saveQueue(); render(); trySync(); },
+  dropFailed:()=>openSheet(`<h3>বাদ দেবেন?</h3><div class="msg err">এই কাজগুলো আর জমা হবে না।</div><div class="gap"><button class="btn danger" data-act="dropFailed2">হ্যাঁ, বাদ দিন</button><button class="btn ghost" data-act="closeSheet">না</button></div>`),
+  dropFailed2:()=>{ FAILED=[]; saveQueue(); closeSheet(); render(); },
+  forgot:()=>{ S.authStep='forgot'; render(); },
+  forgotSend:()=>forgotSend(),
+};
+async function changePinStep(){
+  const t=$('chgTitle'), m=$('sheetMsg');
+  if(S.chg.step===1){ S.chg.first=S.pin; S.pin=''; S.chg.step=2; if(t) t.textContent='আবার সেই পিনটা দিন'; updateDots(); return; }
+  if(S.pin!==S.chg.first){ S.pin=''; S.chg={step:1,first:''}; if(t) t.textContent='নতুন ৬ সংখ্যার পিন দিন'; if(m) m.innerHTML='<div class="msg err">দুটো পিন মেলেনি। আবার দিন।</div>'; updateDots(); return; }
+  S.busy=true; if(m) m.innerHTML='<div class="msg ok">অপেক্ষা করুন...</div>';
+  const { error } = await sb.auth.updateUser({ password:S.pin, data:{ must_change_pin:false } });
+  S.busy=false; S.pinMode=null; S.pin='';
+  if(error){ if(m) m.innerHTML=`<div class="msg err">${esc(friendlyError(error))}</div>`; if(S.forced){ S.pinMode='change'; S.chg={step:1,first:''}; const t2=$('chgTitle'); if(t2) t2.textContent='আবার নতুন ৬ সংখ্যার পিন বানান'; updateDots(); } return; }
+  S.forced=false; if(S.user&&S.user.user_metadata){ S.user.user_metadata.must_change_pin=false; writeJson('sk_user',{id:S.user.id,email:S.user.email,user_metadata:S.user.user_metadata}); }
+  closeSheet(); toast('✔ পিন বদলে গেছে');
+}
+
+// ===================== BOOT =====================
+document.addEventListener('click', e=>{ const el=e.target.closest('[data-act]'); if(!el) return; const f=ACT[el.dataset.act]; if(f){ e.preventDefault(); f(el.dataset.arg, el); } });
+document.addEventListener('input', e=>{ if(e.target.id==='note') E.note=e.target.value; else if(e.target.id==='newName') E.newName=e.target.value; });
+function maybeForcePin(){
+  if(navigator.onLine && S.user && S.user.user_metadata && S.user.user_metadata.must_change_pin && !S.forced){ S.forced=true; ACT.changePin(); }
+}
+function wipe(){
+  Object.assign(S,{ user:null, profile:null, cfg:null, accounts:[], account:null, contacts:[], txns:[], trash:[], loaded:false, loadError:false, expired:false, forced:false, syncing:false, authStep:'phone', pin:'', pinFirst:'', pinMode:null });
+  Q=[]; FAILED=[]; closeSheet(); render();
+}
+async function boot(){
+  const uid=S.user.id;
+  Q=readJson(keyOf('queue',uid),[]); FAILED=readJson(keyOf('failed',uid),[]);
+  const c=readJson(keyOf('cache',uid),null);
+  if(c){ applyCache(c); S.loaded=true; S.loadError=false; render(); }   // আগে ফোনে জমানো খাতা দেখাও (নেট ছাড়াও)
+  try{
+    if(!navigator.onLine) throw new Error('offline');
+    await sync({refresh:false});
+    if(!Q.length) await loadAll();
+    S.loadError=false;
+  }catch(e){ console.warn(e); if(!c) S.loadError=true; }
+  if(!S.loadError) S.loaded=true;
+  render(); maybeForcePin();
+}
+sb.auth.onAuthStateChange((ev, session)=>{
+  setTimeout(()=>{
+    if(session && session.user){
+      const u=session.user;
+      if(!S.user || S.user.id!==u.id){
+        S.user=u; writeJson('sk_user',{ id:u.id, email:u.email, user_metadata:u.user_metadata||{} });
+        S.loaded=false; S.loadError=false; S.screen='home'; S.params={}; render(); boot();
+      } else { S.user=u; trySync(); maybeForcePin(); }
+    } else if(ev==='SIGNED_OUT'){ if(S.user) wipe(); }
+    else if(!S.user){ render(); }
+  },0);
+});
+document.documentElement.style.fontSize = (Number(lsGet('sk_font'))||18)+'px';
+// নেট না থাকলে আগের লগইন-করা ইউজারের খাতা ফোন থেকেই খোলা
+const cachedUser = readJson('sk_user', null);
+if(cachedUser && !navigator.onLine){ S.user=cachedUser; render(); boot(); } else render();
+if('serviceWorker' in navigator && location.protocol!=='file:'){ window.addEventListener('load', ()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); }); }
+</script>
+</body>
+</html>

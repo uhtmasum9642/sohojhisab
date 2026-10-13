@@ -36,8 +36,10 @@
 <div id="modalBg"><div id="modal"></div></div>
 <script>
 const CFG = window.SK_CONFIG || {};
-const OK = /^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(CFG.SUPABASE_URL||'') && (CFG.SUPABASE_KEY||'').length > 20;
-const sb = supabase.createClient(OK?CFG.SUPABASE_URL:'https://placeholder.supabase.co', OK?CFG.SUPABASE_KEY:'placeholder-key-placeholder');
+const CURL = String(CFG.SUPABASE_URL||'').trim().replace(/\/+$/,''), CKEY = String(CFG.SUPABASE_KEY||'').trim();
+const PROBLEM = !window.SK_CONFIG ? 'config.js লোড হয়নি।' : (!CURL||/YOUR/i.test(CURL)) ? 'config.js-এ SUPABASE_URL বদলানো হয়নি (অথবা ব্রাউজারে পুরোনো কপি আছে — পেজ রিফ্রেশ করে দেখুন)।' : !/^https:\/\/[^\s\/]+\.[^\s\/]+$/i.test(CURL) ? 'SUPABASE_URL ফরম্যাট ভুল (https://abcdxyz.supabase.co হতে হবে)।' : (!CKEY||/YOUR/i.test(CKEY)||CKEY.length<20) ? 'SUPABASE_KEY বদলানো হয়নি বা ভুল।' : '';
+const OK = !PROBLEM;
+const sb = supabase.createClient(OK?CURL:'https://placeholder.supabase.co', OK?CKEY:'placeholder-key-placeholder');
 const DOMAIN = 'khata.app';
 const $ = id => document.getElementById(id);
 const esc = s => String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -49,7 +51,7 @@ const daysAgo = d => d ? Math.floor((Date.now()-new Date(d).getTime())/86400000)
 
 function login(msg){
   $('app').innerHTML = `<div class="wrap" style="padding-top:12vh"><h1 style="text-align:center">🔐 অ্যাডমিন</h1>
-    ${OK?'':'<div class="msg">config.js-এ Supabase লিংক/কী বসানো হয়নি।</div>'}
+    ${OK?'':'<div class="msg">'+esc(PROBLEM)+'</div>'}
     <label>মোবাইল নাম্বার</label><input class="field" id="ph" type="tel" inputmode="numeric" placeholder="01XXXXXXXXX">
     <label>৬ সংখ্যার পিন</label><input class="field" id="pw" type="password" inputmode="numeric" maxlength="6">
     ${msg?`<div class="msg">${esc(msg)}</div>`:''}

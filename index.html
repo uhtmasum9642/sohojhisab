@@ -100,9 +100,16 @@
 <script>
 // ===================== CONFIG =====================
 const CFG = window.SK_CONFIG || {};
-const SUPABASE_URL = CFG.SUPABASE_URL || "";
-const SUPABASE_KEY = CFG.SUPABASE_KEY || "";
-const CONFIG_OK = /^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(SUPABASE_URL) && SUPABASE_KEY.length > 20;
+const SUPABASE_URL = String(CFG.SUPABASE_URL||'').trim().replace(/\/+$/,'');
+const SUPABASE_KEY = String(CFG.SUPABASE_KEY||'').trim();
+function configProblem(){
+  if(!window.SK_CONFIG) return 'config.js ফাইলটা লোড হয়নি। ফাইলের নাম ঠিক config.js কিনা এবং রিপোর একদম উপরের স্তরে (root-এ) আছে কিনা দেখুন। অথবা নিচের "পুরোনো কপি মুছুন" বাটন চাপুন।';
+  if(!SUPABASE_URL || /YOUR/i.test(SUPABASE_URL)) return 'config.js-এ SUPABASE_URL এখনো বদলানো হয়নি (বা ফোনে config.js-এর পুরোনো কপি আছে — নিচের "পুরোনো কপি মুছুন" বাটন চাপুন)।';
+  if(!/^https:\/\/[^\s\/]+\.[^\s\/]+$/i.test(SUPABASE_URL)) return 'SUPABASE_URL ঠিক ফরম্যাটে নেই। এরকম হতে হবে: https://abcdxyz.supabase.co';
+  if(!SUPABASE_KEY || /YOUR/i.test(SUPABASE_KEY) || SUPABASE_KEY.length<20) return 'SUPABASE_KEY এখনো বদলানো হয়নি, অথবা ছোট/ভুল।';
+  return '';
+}
+const CONFIG_OK = !configProblem();
 const sb = supabase.createClient(CONFIG_OK ? SUPABASE_URL : "https://placeholder.supabase.co", CONFIG_OK ? SUPABASE_KEY : "placeholder-key-placeholder");
 const EMAIL_DOMAIN = "khata.app"; // ফোন নাম্বার থেকে ছদ্ম-ইমেইল: 01XXXXXXXXX@khata.app
 
@@ -725,7 +732,7 @@ function applySpeech(text){
 function go(screen, params){ S.screen=screen; S.params=params||{}; render(); window.scrollTo(0,0); }
 function render(){
   const app=$('app');
-  if(!CONFIG_OK){ app.innerHTML='<div class="auth"><div class="logo">🛠️</div><h1>সেটআপ বাকি</h1><p class="sub">config.js ফাইলে Supabase-এর লিংক ও কী বসানো হয়নি। SETUP.md-এর ধাপ ৭ দেখুন।</p></div>'; return; }
+  if(!CONFIG_OK){ app.innerHTML='<div class="auth"><div class="logo">🛠️</div><h1>সেটআপ বাকি</h1><div class="msg err">'+esc(configProblem())+'</div><p class="sub">SETUP.md-এর ধাপ ৭ দেখুন।</p><button class="btn gold" data-act="clearCache">🧹 পুরোনো কপি মুছুন ও আবার খুলুন</button></div>'; return; }
   if(!S.user){ app.innerHTML=authHtml(); return; }
   if(S.loadError){ app.innerHTML=`<div class="auth"><div class="logo">📡</div><h1>খাতা খোলা যায়নি</h1><p class="sub">ইন্টারনেট দেখে আবার চেষ্টা করুন</p><button class="btn gold" data-act="retry">🔄 আবার চেষ্টা করুন</button></div>`; return; }
   if(!S.loaded){ app.innerHTML='<div class="empty" style="padding-top:35vh">অপেক্ষা করুন...</div>'; return; }
@@ -777,6 +784,7 @@ const ACT = {
   retryFailed:()=>{ Q=FAILED.concat(Q); FAILED=[]; saveQueue(); render(); trySync(); },
   dropFailed:()=>openSheet(`<h3>বাদ দেবেন?</h3><div class="msg err">এই কাজগুলো আর জমা হবে না।</div><div class="gap"><button class="btn danger" data-act="dropFailed2">হ্যাঁ, বাদ দিন</button><button class="btn ghost" data-act="closeSheet">না</button></div>`),
   dropFailed2:()=>{ FAILED=[]; saveQueue(); closeSheet(); render(); },
+  clearCache:async()=>{ try{ const rs=await navigator.serviceWorker.getRegistrations(); await Promise.all(rs.map(r=>r.unregister())); const ks=await caches.keys(); await Promise.all(ks.map(k=>caches.delete(k))); }catch(e){} location.reload(); },
   forgot:()=>{ S.authStep='forgot'; render(); },
   forgotSend:()=>forgotSend(),
 };

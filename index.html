@@ -91,6 +91,8 @@
   .sync{ position:sticky; top:0; z-index:30; text-align:center; font-size:.85rem; font-weight:600; padding:.45rem .8rem; }
   .sync.off{ background:#fff3cd; color:#7a5b00; } .sync.ing{ background:#e6eeff; color:var(--blue); } .sync.bad{ background:var(--red-bg); color:var(--red); cursor:pointer; }
   .pend{ font-size:.8rem; }
+  .bdg{ display:inline-block; padding:.05rem .6rem; border-radius:1rem; font-size:.8rem; font-weight:700; margin-left:.3rem; }
+  .bdg.ok{ background:var(--green-bg); color:var(--green);} .bdg.no{ background:var(--red-bg); color:var(--red);} .bdg.wr{ background:#fff3cd; color:#7a5b00;} .bdg.in{ background:var(--blue-bg); color:var(--blue);}
 </style>
 </head>
 <body>
@@ -207,7 +209,7 @@ const S = {
   screen:'home', params:{}, loaded:false, expired:false,
   authMode:'login', authStep:'phone', authPhone:'', authName:'', pin:'', pinFirst:'',
 };
-const E = { type:null, amount:'', note:'', contactId:null, adding:false, newName:'', fromPerson:false, listening:false, heard:'' };
+const E = { type:null, amount:'', note:'', contactId:null, adding:false, newName:'', fromPerson:false, listening:false, heard:'', category:'', credit:false };
 const TYPE = {
   income:     { label:'আয়',          sub:'টাকা পেলাম',            icon:'💰', cls:'income',  color:'g', person:false },
   expense:    { label:'খরচ',          sub:'টাকা খরচ করলাম',        icon:'🛒', cls:'expense', color:'r', person:false },
@@ -215,7 +217,14 @@ const TYPE = {
   payable:    { label:'ধার নিলাম',    sub:'কারো থেকে ধার নিলাম',   icon:'🙏', cls:'borrow',  color:'b', person:true },
   receive_due:{ label:'ফেরত পেলাম',   sub:'ধারের টাকা ফেরত পেলাম', icon:'✅', cls:'income',  color:'g', person:true },
   pay_due:    { label:'ফেরত দিলাম',   sub:'ধারের টাকা ফেরত দিলাম', icon:'↩️', cls:'expense', color:'r', person:true },
+  expense_credit:{ label:'বাকিতে খরচ', sub:'', icon:'🧾', cls:'expense', color:'r', person:true },
+  income_credit: { label:'বাকিতে আয়',  sub:'', icon:'🧾', cls:'income',  color:'g', person:true },
 };
+const CATS = {
+  expense:[['food','🍚 খাবার'],['market','🛒 বাজার'],['tea','☕ চা-নাস্তা'],['transport','🚌 যাতায়াত'],['health','💊 চিকিৎসা'],['rent','🏠 ঘরভাড়া'],['bill','💡 বিল'],['mobile','📱 মোবাইল'],['edu','📚 শিক্ষা'],['cloth','👕 পোশাক'],['other','📦 অন্যান্য']],
+  income:[['wage','🛠️ মজুরি'],['sale','🏪 বিক্রি'],['salary','💼 বেতন'],['other_in','🎁 অন্য আয়']],
+};
+const catLabel = k => { for(const l of [CATS.expense,CATS.income]){ const f=l.find(x=>x[0]===k); if(f) return f[1]; } return ''; };
 const OLD_LABEL = { sale:'বিক্রি', purchase:'ক্রয়', transfer:'ট্রান্সফার', opening_balance:'শুরুর টাকা' };
 const typeLabel = t => (TYPE[t] && TYPE[t].label) || OLD_LABEL[t] || t;
 const typeIcon  = t => (TYPE[t] && TYPE[t].icon) || (t==='sale'?'💰':t==='purchase'?'🛒':'📒');
@@ -254,8 +263,8 @@ function cashBalance(){
   let b = S.accounts.reduce((s,a)=>s+(Number(a.opening_balance)||0),0);
   S.txns.forEach(t=>{ b += cashEffect(t); }); return b;
 }
-function incomeOf(t){ return t.transaction_type==='income' ? Number(t.total_amount)||0 : t.transaction_type==='sale' ? Number(t.paid_amount!=null?t.paid_amount:t.total_amount)||0 : 0; }
-function expenseOf(t){ return t.transaction_type==='expense' ? Number(t.total_amount)||0 : t.transaction_type==='purchase' ? Number(t.paid_amount!=null?t.paid_amount:t.total_amount)||0 : 0; }
+function incomeOf(t){ return t.transaction_type==='income'||t.transaction_type==='income_credit' ? Number(t.total_amount)||0 : t.transaction_type==='sale' ? Number(t.paid_amount!=null?t.paid_amount:t.total_amount)||0 : 0; }
+function expenseOf(t){ return t.transaction_type==='expense'||t.transaction_type==='expense_credit' ? Number(t.total_amount)||0 : t.transaction_type==='purchase' ? Number(t.paid_amount!=null?t.paid_amount:t.total_amount)||0 : 0; }
 // positive = সে আমাকে দেবে (পাবো), negative = আমি তাকে দেবো (দেবো)
 function personBal(id){
   const c = S.contacts.find(x=>x.id===id); let bal = c ? (Number(c.opening_balance)||0) : 0;
@@ -264,6 +273,7 @@ function personBal(id){
     if(t.transaction_type==='sale') bal+=due; else if(t.transaction_type==='purchase') bal-=due;
     else if(t.transaction_type==='receivable') bal+=total; else if(t.transaction_type==='payable') bal-=total;
     else if(t.transaction_type==='receive_due') bal-=total; else if(t.transaction_type==='pay_due') bal+=total;
+    else if(t.transaction_type==='income_credit') bal+=total; else if(t.transaction_type==='expense_credit') bal-=total;
   });
   return Math.round(bal*100)/100;
 }
@@ -325,9 +335,10 @@ async function createPerson(name, phone){
   enqueue({ op:'addContact', id:c.id, data:{ contact_name:c.contact_name, contact_type:'personal', opening_balance:0, phone:c.phone } });
   return c;
 }
-async function saveTxn(type, amount, contactId, note){
+async function saveTxn(type, amount, contactId, note, category){
+  const isCr = type==='expense_credit'||type==='income_credit';
   const data = { transaction_no:'TXN-'+Date.now()+'-'+Math.floor(Math.random()*1000), transaction_date:localDate(), transaction_type:type, status:'completed',
-    account_id:S.account.id, contact_id:contactId||null, total_amount:amount, paid_amount:amount, due_amount:0, notes:note||null };
+    account_id:S.account.id, contact_id:contactId||null, total_amount:amount, paid_amount:isCr?0:amount, due_amount:isCr?amount:0, notes:note||null, category:category||null };
   const t = Object.assign({ id:tmpId(), user_id:S.user.id, created_at:new Date().toISOString(), deleted_at:null, _pending:true }, data);
   S.txns.unshift(t);
   enqueue({ op:'addTxn', id:t.id, data });
@@ -502,6 +513,63 @@ function authNext(){
   S.authPhone = phone; S.pin=''; S.pinFirst=''; S.authStep='pin'; render();
 }
 
+// ===================== অ্যাডমিন (শুধু is_admin ইউজার দেখে; আসল নিরাপত্তা ডাটাবেজ নিজে দেয়) =====================
+const A = { profiles:[], reqs:[], cfg:{}, loaded:false, err:'' };
+const phoneOf = p => (p.email||'').endsWith('@'+EMAIL_DOMAIN) ? p.email.split('@')[0] : '';
+const fmtD = d => d ? niceDate(localDate(new Date(d))) : '—';
+const daysSince = d => d ? Math.floor((Date.now()-new Date(d).getTime())/86400000) : null;
+async function adminLoad(){
+  A.err='';
+  try{
+    const [p,r,c] = await Promise.all([
+      sb.from('profiles').select('*').order('created_at',{ascending:false}),
+      sb.from('pin_reset_requests').select('*').eq('status','pending').order('created_at',{ascending:false}),
+      sb.from('app_config').select('*').eq('id',1).maybeSingle() ]);
+    if(p.error) throw p.error;
+    A.profiles=p.data||[]; A.reqs=r.data||[]; A.cfg=c.data||{}; A.loaded=true;
+  }catch(e){ A.err=friendlyError(e); }
+  if(S.screen==='admin') render(); else updateNavBadge();
+}
+function updateNavBadge(){ if(['home','people','history','settings'].includes(S.screen)) render(); }
+function adminHtml(){
+  const hd = '<div class="hdr"><h1>👑 অ্যাডমিন</h1><p>ইউজার, মেয়াদ ও পিন-রিসেট</p></div>';
+  if(!S.profile || !S.profile.is_admin) return hd+'<div class="wrap"><div class="empty">এটা শুধু অ্যাডমিনের জন্য</div></div>';
+  if(A.err) return hd+`<div class="wrap"><div class="msg err">${esc(A.err)}</div><button class="btn gold" data-act="adminOpen">🔄 আবার চেষ্টা</button></div>`;
+  if(!A.loaded) return hd+'<div class="wrap"><div class="empty">লোড হচ্ছে...</div></div>';
+  const users = A.profiles.filter(p=>!p.is_admin).sort((a,b)=>(a.last_active_at?new Date(a.last_active_at).getTime():0)-(b.last_active_at?new Date(b.last_active_at).getTime():0));
+  const act7 = users.filter(p=>{ const d=daysSince(p.last_active_at); return d!==null&&d<7; }).length;
+  const exp = users.filter(p=>p.access_expires_at && new Date(p.access_expires_at).getTime()<Date.now()).length;
+  const st = p => !p.access_expires_at ? '<span class="bdg ok">আজীবন</span>' : new Date(p.access_expires_at).getTime()<Date.now() ? '<span class="bdg no">মেয়াদ শেষ</span>' : `<span class="bdg ok">চালু · ${fmtD(p.access_expires_at)} পর্যন্ত</span>`;
+  const ac = p => { const d=daysSince(p.last_active_at); return d===null ? '<span class="bdg no">কখনো ঢোকেনি</span>' : `<span class="bdg ${d>=30?'no':d>=7?'wr':'in'}">${d<=0?'আজ ঢুকেছে':toBn(d)+' দিন আগে ঢুকেছে'}</span>`; };
+  const cfg=A.cfg||{};
+  return hd+`<div class="wrap">
+  <div class="two" style="grid-template-columns:repeat(3,1fr)"><div class="mini"><div class="val">${toBn(users.length)}</div><div class="lbl">মোট ইউজার</div></div><div class="mini"><div class="val g">${toBn(act7)}</div><div class="lbl">৭ দিনে সক্রিয়</div></div><div class="mini"><div class="val r">${toBn(exp)}</div><div class="lbl">মেয়াদ শেষ</div></div></div>
+  ${A.reqs.length?`<div class="card" style="border:2px solid var(--gold);background:#fff9e6;margin-top:.9rem"><b>🔑 পিন রিসেটের অনুরোধ (${toBn(A.reqs.length)})</b>${A.reqs.map(r=>{ const p=A.profiles.find(x=>x.email===r.phone+'@'+EMAIL_DOMAIN);
+    return `<div class="row"><div class="mid"><div class="t">${p?esc(p.full_name||'(নাম নেই)'):'(অ্যাকাউন্ট নেই)'}</div><div class="n">${toBn(esc(r.phone))}</div></div>${p?`<button class="chip on" data-act="admReset" data-arg="${p.id}" data-req="${r.id}" data-ph="${esc(r.phone)}">🔑 নতুন পিন</button>`:`<button class="chip" data-act="admDismiss" data-arg="${r.id}">বাদ দিন</button>`}</div>`; }).join('')}</div>`:''}
+  <div class="sec">ইউজার <span class="s" style="font-weight:400;font-size:.85rem">(যারা অনেকদিন আসেনি তারা আগে)</span></div>
+  ${users.length?users.map(p=>{ const ph=phoneOf(p); return `<div class="card"><div><b>${esc(p.full_name||'(নাম নেই)')}</b> ${st(p)}</div>
+    <div class="s" style="font-size:.88rem">${toBn(esc(ph||p.email||''))} · যোগ দিয়েছে ${fmtD(p.created_at)}</div><div style="margin-top:.2rem">${ac(p)}</div>
+    <div class="chips" style="margin-top:.6rem"><button class="chip" data-act="admExt" data-arg="${p.id}" data-days="30">+১ মাস</button><button class="chip" data-act="admExt" data-arg="${p.id}" data-days="365">+১ বছর</button><button class="chip" data-act="admLife" data-arg="${p.id}">আজীবন</button><button class="chip" data-act="admRev" data-arg="${p.id}" style="color:var(--red)">এখনই বন্ধ</button>
+    ${ph?`<a class="chip" style="text-decoration:none;color:inherit" target="_blank" href="https://wa.me/88${ph}?text=${encodeURIComponent('আসসালামু আলাইকুম '+(p.full_name||'')+', অনেকদিন ধরে আপনি সহজ হিসাব অ্যাপে ঢুকছেন না। কোনো সমস্যা হচ্ছে কি? সাহায্য লাগলে জানান।')}">💬 হোয়াটসঅ্যাপ</a><button class="chip" data-act="admReset" data-arg="${p.id}" data-ph="${ph}">🔑 পিন রিসেট</button>`:''}</div></div>`; }).join(''):'<div class="card empty">এখনো কোনো ইউজার নেই</div>'}
+  <div class="sec">⚙️ যোগাযোগ ও পেমেন্ট তথ্য <span class="s" style="font-weight:400;font-size:.85rem">(মেয়াদ-শেষ স্ক্রিনে দেখায়)</span></div>
+  <div class="card"><label class="l" style="margin-top:0">ফোন</label><input class="field" id="c_phone" value="${esc(cfg.contact_phone||'')}" placeholder="01XXXXXXXXX">
+  <label class="l">হোয়াটসঅ্যাপ (দেশ-কোডসহ)</label><input class="field" id="c_wa" value="${esc(cfg.contact_whatsapp||'')}" placeholder="8801XXXXXXXXX">
+  <label class="l">পেমেন্ট নির্দেশনা</label><input class="field" id="c_pay" value="${esc(cfg.payment_instructions||'')}" placeholder="যেমন: বিকাশে 01XXXXXXXXX নাম্বারে সেন্ড মানি">
+  <button class="btn gold sm" data-act="admCfg" style="margin-top:.8rem">সংরক্ষণ করুন</button></div></div>`;
+}
+async function admSet(id, iso){
+  const { error } = await sb.from('profiles').update({ access_expires_at:iso }).eq('id',id);
+  if(error){ toast(friendlyError(error)); return; } await adminLoad(); toast('✔ হয়েছে');
+}
+async function admReset(id, reqId, phone){
+  if(!confirm('নতুন পিন বানাবেন? আগের পিন আর কাজ করবে না।')) return;
+  const { data, error } = await sb.functions.invoke('reset-pin', { body:{ user_id:id, request_id:reqId||null } });
+  if(error || !data || data.error){ openSheet(`<h3>পিন রিসেট হয়নি</h3><div class="msg err">${esc((data&&data.error)||(error&&error.message)||'অজানা সমস্যা')}</div><p class="s">Supabase-এ reset-pin ফাংশন ডিপ্লয় করা আছে কিনা দেখুন (SETUP.md ধাপ ৫)।</p><div class="gap"><button class="btn ghost" data-act="closeSheet">বন্ধ করুন</button></div>`); return; }
+  const ph=data.phone||phone, msg='আসসালামু আলাইকুম। আপনার সহজ হিসাব অ্যাপের নতুন পিন: '+data.pin+' । এই পিন দিয়ে ঢুকুন, তারপর নিজের পছন্দের নতুন পিন বানিয়ে নেবেন।';
+  openSheet(`<h3>🔑 নতুন পিন তৈরি হয়েছে</h3><div style="text-align:center;font-size:2.6rem;font-weight:800;letter-spacing:.35rem;margin:.4rem 0">${esc(data.pin)}</div><div style="text-align:center">${toBn(esc(ph))}</div><div class="gap"><a class="btn primary" style="text-decoration:none" target="_blank" href="https://wa.me/88${esc(ph)}?text=${encodeURIComponent(msg)}">💬 হোয়াটসঅ্যাপে পাঠান</a><button class="btn ghost" data-act="closeSheet">বন্ধ করুন</button></div><p class="s" style="text-align:center">এই পিন শুধু এখানেই দেখা যাচ্ছে — এখনই পাঠিয়ে দিন।</p>`);
+  adminLoad();
+}
+
 async function forgotSend(){
   const phone = toEn(($('authPhone').value||'').replace(/[\s-]/g,'')).replace(/^\+?88/,'');
   if(!/^01[3-9]\d{8}$/.test(phone)){ authMsg('সঠিক ১১ সংখ্যার মোবাইল নাম্বার লিখুন।'); return; }
@@ -527,14 +595,15 @@ function expiredHtml(){
 // ===================== SCREENS =====================
 function navHtml(){
   const items=[['home','🏠','হোম'],['people','👥','মানুষ'],['history','📒','হিসাব'],['settings','⚙️','সেটিং']];
+  if(S.profile && S.profile.is_admin) items.push(['admin','👑','অ্যাডমিন'+(A.reqs.length?' ('+toBn(A.reqs.length)+')':'')]);
   const cur = S.screen==='person'?'people':S.screen==='trash'?'history':S.screen;
-  return '<div class="nav"><div class="in">'+items.map(([k,i,l])=>`<button class="${cur===k?'on':''}" data-act="nav" data-arg="${k}"><span class="ic">${i}</span>${l}</button>`).join('')+'</div></div>';
+  return '<div class="nav"><div class="in">'+items.map(([k,i,l])=>`<button class="${cur===k?'on':''}" data-act="${k==='admin'?'adminOpen':'nav'}" data-arg="${k}"><span class="ic">${i}</span>${l}</button>`).join('')+'</div></div>';
 }
 function txnRowHtml(t, showPerson){
-  const col = {income:'g',sale:'g',receive_due:'g',expense:'r',purchase:'r',pay_due:'r',receivable:'o',payable:'b'}[t.transaction_type]||'';
+  const col = {income:'g',sale:'g',receive_due:'g',income_credit:'g',expense:'r',purchase:'r',pay_due:'r',expense_credit:'r',receivable:'o',payable:'b'}[t.transaction_type]||'';
   const nm = t.contact_id ? personName(t.contact_id) : '';
   return `<div class="row" data-act="txn" data-arg="${t.id}"><div class="ico">${typeIcon(t.transaction_type)}</div>
-    <div class="mid"><div class="t">${esc(typeLabel(t.transaction_type))}${showPerson&&nm?' — '+esc(nm):''}${t._pending?' <span class="pend">⏳</span>':''}</div>${t.notes?`<div class="n">${esc(t.notes)}</div>`:''}</div>
+    <div class="mid"><div class="t">${esc(typeLabel(t.transaction_type))}${showPerson&&nm?' — '+esc(nm):''}${t._pending?' <span class="pend">⏳</span>':''}</div>${(t.category||t.notes)?`<div class="n">${t.category?esc(catLabel(t.category))+(t.notes?' · ':''):''}${esc(t.notes||'')}</div>`:''}</div>
     <div class="amt ${col}">${taka(t.total_amount)}</div></div>`;
 }
 function homeHtml(){
@@ -582,8 +651,14 @@ function personHtml(){
   <div class="gap" style="margin:0 0 .9rem">${btns}<button class="btn gold sm" data-act="share" data-arg="${c.id}">📤 খাতা পাঠান (হোয়াটসঅ্যাপ)</button></div>
   <div class="sec">সব হিসাব</div><div class="card" style="padding:.3rem .8rem">
   ${ob?`<div class="row"><div class="ico">📒</div><div class="mid"><div class="t">আগের বাকি</div></div><div class="amt ${ob>0?'g':'r'}">${taka(Math.abs(ob))}</div></div>`:''}
-  ${tx.length? tx.map(t=>`<div class="row" data-act="txn" data-arg="${t.id}"><div class="ico">${typeIcon(t.transaction_type)}</div><div class="mid"><div class="t">${esc(typeLabel(t.transaction_type))}${t._pending?' <span class="pend">⏳</span>':''}</div><div class="n">${niceDate(t.transaction_date)}${t.notes?' · '+esc(t.notes):''}</div></div><div class="amt ${{receivable:'o',payable:'b',receive_due:'g',pay_due:'r'}[t.transaction_type]||''}">${taka(t.total_amount)}</div></div>`).join('') : (ob?'':'<div class="empty">এখনো কোনো হিসাব নেই</div>')}
+  ${tx.length? tx.map(t=>`<div class="row" data-act="txn" data-arg="${t.id}"><div class="ico">${typeIcon(t.transaction_type)}</div><div class="mid"><div class="t">${esc(typeLabel(t.transaction_type))}${t._pending?' <span class="pend">⏳</span>':''}</div><div class="n">${niceDate(t.transaction_date)}${t.notes?' · '+esc(t.notes):''}</div></div><div class="amt ${{receivable:'o',payable:'b',receive_due:'g',pay_due:'r',expense_credit:'r',income_credit:'g'}[t.transaction_type]||''}">${taka(t.total_amount)}</div></div>`).join('') : (ob?'':'<div class="empty">এখনো কোনো হিসাব নেই</div>')}
   </div><button class="btn ghost sm" data-act="personMore" data-arg="${c.id}">⋯ আরও (নাম বদলান / মুছুন)</button></div>`;
+}
+function catBreakdownHtml(list){
+  const agg=fn=>{ const m={}; list.forEach(t=>{ const v=fn(t); if(v>0){ const k=t.category||'other'; m[k]=(m[k]||0)+v; } }); return Object.entries(m).sort((a,b)=>b[1]-a[1]); };
+  const blk=(title,rows,c,v)=>{ if(!rows.length) return ''; const tot=rows.reduce((s,r)=>s+r[1],0);
+    return `<div class="sec">${title}</div><div class="card">${rows.map(([k,x])=>`<div style="margin:.5rem 0"><div style="display:flex;justify-content:space-between"><span>${esc(catLabel(k)||'📦 অন্যান্য')}</span><b class="${c}">${taka(x)}</b></div><div style="height:.45rem;background:#eef0f3;border-radius:.3rem"><div style="height:100%;width:${Math.round(x*100/tot)}%;background:var(--${v});border-radius:.3rem"></div></div></div>`).join('')}</div>`; };
+  return blk('কোথায় খরচ হলো',agg(expenseOf),'r','red')+blk('আয় কোথা থেকে',agg(incomeOf),'g','green');
 }
 function historyHtml(){
   const r = S.params.range||'today', t=localDate();
@@ -597,7 +672,8 @@ function historyHtml(){
   <div class="wrap"><div class="chips" style="margin-bottom:.9rem">${chips}</div>
   <div class="two" style="margin-bottom:.5rem"><div class="mini"><div class="lbl">মোট আয়</div><div class="val g">${taka(inc)}</div></div><div class="mini"><div class="lbl">মোট খরচ</div><div class="val r">${taka(exp)}</div></div></div>
   <div class="mini" style="margin-bottom:.9rem"><div class="lbl">বাঁচল</div><div class="val ${inc-exp<0?'r':'g'}">${taka(inc-exp)}</div></div>
-  <div class="card" style="padding:.3rem .8rem">${body||'<div class="empty">এই সময়ে কোনো হিসাব নেই</div>'}</div>
+  ${catBreakdownHtml(list)}
+  <div class="sec">সব এন্ট্রি</div><div class="card" style="padding:.3rem .8rem">${body||'<div class="empty">এই সময়ে কোনো হিসাব নেই</div>'}</div>
   <button class="btn ghost sm" data-act="trash">🗑 মুছে ফেলা হিসাব (${toBn(S.trash.length)})</button></div>`;
 }
 function trashHtml(){
@@ -625,7 +701,7 @@ function candidates(){
   return l;
 }
 function chipsHtml(){
-  const canNew = E.type==='receivable'||E.type==='payable';
+  const canNew = E.type==='receivable'||E.type==='payable'||E.credit;
   const l = candidates();
   let h = l.map(c=>`<button class="chip ${E.contactId===c.id?'on':''}" data-act="pick" data-arg="${c.id}">${esc(c.contact_name)}</button>`).join('');
   if(canNew) h += `<button class="chip ${E.adding?'on':''}" data-act="pickNew">➕ নতুন মানুষ</button>`;
@@ -640,14 +716,18 @@ function entryHtml(){
     ${micSupported()?`<button class="mic ${E.listening?'on':''}" id="micBtn" data-act="mic">🎤 ${E.listening?'শুনছি... (থামাতে চাপ দিন)':'বলে লিখুন'}</button><div id="hear"></div>`:'<div class="s" style="text-align:center">এই ফোনে বলে লেখা চলবে না। নিচে টাইপ করুন।</div>'}
     <div class="amount-box"><div class="s" style="font-size:.9rem">কত টাকা?</div><div class="val ${T.color}" id="amtVal">${amtText()}</div></div>
     ${padHtml('amt')}
-    ${T.person?`<label class="l">কার সাথে?</label><div class="chips" id="chips">${chipsHtml()}</div>`:''}
+    ${CATS[E.type]?`<label class="l">কোন ধরনের? <span class="s">(না বাছলেও চলবে)</span></label><div class="chips" id="cats">${catsHtml()}</div>`:''}
+    ${CATS[E.type]?`<button class="chip ${E.credit?'on':''}" data-act="credit" style="margin-top:.9rem">🧾 ${E.type==='expense'?'বাকিতে (এখন টাকা দিইনি)':'বাকিতে (এখনো টাকা পাইনি)'}</button>`:''}
+    ${(T.person||E.credit)?`<label class="l">${E.credit?(E.type==='expense'?'কার কাছে বাকি?':'কার কাছে পাবো?'):'কার সাথে?'}</label><div class="chips" id="chips">${chipsHtml()}</div>`:''}
     <label class="l">কী বিষয়? <span class="s">(না লিখলেও চলবে)</span></label>
     <input class="field" id="note" placeholder="${E.type==='expense'?'যেমন: চাল কিনলাম':E.type==='income'?'যেমন: আজকের মজুরি':'যেমন: চিকিৎসার জন্য'}" value="${esc(E.note)}">
     <button class="btn primary" data-act="entrySave" style="margin-top:1rem">✔ সেভ করুন</button>
   </div>`;
 }
+function catsHtml(){ return (CATS[E.type]||[]).map(([k,l])=>`<button class="chip ${E.category===k?'on':''}" data-act="cat" data-arg="${k}">${l}</button>`).join(''); }
+function effType(){ return E.credit ? (E.type==='expense'?'expense_credit':'income_credit') : E.type; }
 function startEntry(type, pid){
-  Object.assign(E,{ type, amount:'', note:'', contactId:pid||null, adding:false, newName:'', fromPerson:!!pid, listening:false });
+  Object.assign(E,{ type, amount:'', note:'', contactId:pid||null, adding:false, newName:'', fromPerson:!!pid, listening:false, category:'', credit:false });
   go('entry');
 }
 function amtKey(k){
@@ -655,11 +735,13 @@ function amtKey(k){
   else if(E.amount.length<9){ if(!(E.amount===''&&(k==='0'||k==='00'))) E.amount+=k; }
   const el=$('amtVal'); if(el) el.textContent=amtText();
 }
-function sentenceFor(type, amt, nm, note){
-  const a=fmtNum(amt)+' টাকা';
+function sentenceFor(type, amt, nm, note, cat){
+  const a=fmtNum(amt)+' টাকা', c=cat?' ('+catLabel(cat).replace(/^\S+\s/,'')+')':'';
   switch(type){
-    case 'income': return a+' আয়'+(note?' — '+note:'');
-    case 'expense': return a+' খরচ'+(note?' — '+note:'');
+    case 'income': return a+' আয়'+c+(note?' — '+note:'');
+    case 'expense': return a+' খরচ'+c+(note?' — '+note:'');
+    case 'expense_credit': return nm+'-এর কাছে '+a+' বাকিতে খরচ'+c+(note?' — '+note:'')+' (এখন টাকা দিইনি)';
+    case 'income_credit': return nm+'-এর কাছে '+a+' বাকিতে আয়'+c+(note?' — '+note:'')+' (এখনো পাইনি)';
     case 'receivable': return nm+'-কে '+a+' ধার দিলাম';
     case 'payable': return nm+'-এর কাছ থেকে '+a+' ধার নিলাম';
     case 'receive_due': return nm+'-এর কাছ থেকে '+a+' ফেরত পেলাম';
@@ -669,11 +751,11 @@ function sentenceFor(type, amt, nm, note){
 function entrySave(){
   const amt=parseFloat(E.amount); const T=TYPE[E.type];
   if(!(amt>0)){ toast('আগে টাকার অঙ্ক লিখুন'); return; }
-  if(T.person && !E.contactId && !(E.adding && E.newName.trim())){ toast('কার সাথে? নাম বাছুন'); return; }
+  if((T.person||E.credit) && !E.contactId && !(E.adding && E.newName.trim())){ toast('কার সাথে? নাম বাছুন'); return; }
   const nm = E.contactId ? personName(E.contactId) : E.newName.trim();
-  S.sentence = sentenceFor(E.type, amt, nm, E.note);
+  S.sentence = sentenceFor(effType(), amt, nm, E.note, E.category);
   openSheet(`<h3>এটা ঠিক আছে?</h3><div class="card" style="font-size:1.3rem;font-weight:700">${esc(S.sentence)}</div>
-    ${T.person&&E.note?`<div class="s" style="margin-bottom:.4rem">বিষয়: ${esc(E.note)}</div>`:''}
+    ${(T.person||E.credit)&&E.note?`<div class="s" style="margin-bottom:.4rem">বিষয়: ${esc(E.note)}</div>`:''}
     <div id="sheetMsg"></div>
     <div class="gap"><button class="btn primary" id="confirmBtn" data-act="entryConfirm">✔ হ্যাঁ, সেভ করুন</button>
     <button class="btn ghost sm" data-act="speak">🔊 পড়ে শোনান</button>
@@ -685,7 +767,7 @@ async function entryConfirm(){
   try{
     let cid=E.contactId;
     if(!cid && E.adding && E.newName.trim()){ const p = await createPerson(E.newName); cid=p.id; }
-    const txn = await saveTxn(E.type, parseFloat(E.amount), cid, E.note.trim());
+    const txn = await saveTxn(effType(), parseFloat(E.amount), cid, E.note.trim(), E.category);
     closeSheet();
     const back = E.fromPerson ? ['person',{id:cid}] : ['home',{}];
     go(back[0], back[1]);
@@ -717,7 +799,7 @@ function startMic(){
 function applySpeech(text){
   const r = parseSpeech(text); let note = r.note;
   const T = TYPE[E.type];
-  if(T.person){
+  if(T.person||E.credit){
     if(!E.contactId){ const c = S.contacts.find(c=>text.includes(c.contact_name)); if(c){ E.contactId=c.id; E.adding=false; const ch=$('chips'); if(ch) ch.innerHTML=chipsHtml(); } }
     const nm = E.contactId?personName(E.contactId):'';
     if(nm) note = note.split(nm).join(' ');
@@ -737,7 +819,7 @@ function render(){
   if(S.loadError){ app.innerHTML=`<div class="auth"><div class="logo">📡</div><h1>খাতা খোলা যায়নি</h1><p class="sub">ইন্টারনেট দেখে আবার চেষ্টা করুন</p><button class="btn gold" data-act="retry">🔄 আবার চেষ্টা করুন</button></div>`; return; }
   if(!S.loaded){ app.innerHTML='<div class="empty" style="padding-top:35vh">অপেক্ষা করুন...</div>'; return; }
   if(S.expired){ app.innerHTML=expiredHtml(); return; }
-  const f = { home:homeHtml, people:peopleHtml, person:personHtml, history:historyHtml, trash:trashHtml, settings:settingsHtml, entry:entryHtml }[S.screen] || homeHtml;
+  const f = { home:homeHtml, people:peopleHtml, person:personHtml, history:historyHtml, trash:trashHtml, settings:settingsHtml, entry:entryHtml, admin:adminHtml }[S.screen] || homeHtml;
   app.innerHTML = '<div id="syncBar">'+syncBarHtml()+'</div>' + f() + (S.screen==='entry'?'':navHtml());
 }
 function shareText(c){
@@ -754,6 +836,8 @@ const ACT = {
   entry:(a,el)=>startEntry(a, el.dataset.person), entryBack:()=>{ if(E.listening&&rec){ try{rec.stop();}catch(e){} } E.fromPerson&&E.contactId ? go('person',{id:E.contactId}) : go('home'); },
   amt:(a)=>amtKey(a), pin:(a)=>pinKey(a), mic:()=>startMic(), entrySave:()=>entrySave(), entryConfirm:()=>entryConfirm(), closeSheet:()=>closeSheet(),
   speak:()=>{ try{ speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(S.sentence); u.lang='bn-BD'; speechSynthesis.speak(u); }catch(e){ toast('এই ফোনে পড়ে শোনানো চলবে না'); } },
+  cat:(a)=>{ E.category = E.category===a ? '' : a; $('cats').innerHTML=catsHtml(); },
+  credit:()=>{ E.credit=!E.credit; if(!E.credit){ E.contactId=null; E.adding=false; } const y=window.scrollY; render(); window.scrollTo(0,y); },
   pick:(a)=>{ E.contactId=a; E.adding=false; $('chips').innerHTML=chipsHtml(); },
   pickNew:()=>{ E.adding=!E.adding; E.contactId=null; $('chips').innerHTML=chipsHtml(); if(E.adding){ const n=$('newName'); n&&n.focus(); } },
   authNext:()=>authNext(), authMode:()=>{ S.authMode=S.authMode==='login'?'signup':'login'; S.authStep='phone'; render(); },
@@ -785,6 +869,13 @@ const ACT = {
   dropFailed:()=>openSheet(`<h3>বাদ দেবেন?</h3><div class="msg err">এই কাজগুলো আর জমা হবে না।</div><div class="gap"><button class="btn danger" data-act="dropFailed2">হ্যাঁ, বাদ দিন</button><button class="btn ghost" data-act="closeSheet">না</button></div>`),
   dropFailed2:()=>{ FAILED=[]; saveQueue(); closeSheet(); render(); },
   clearCache:async()=>{ try{ const rs=await navigator.serviceWorker.getRegistrations(); await Promise.all(rs.map(r=>r.unregister())); const ks=await caches.keys(); await Promise.all(ks.map(k=>caches.delete(k))); }catch(e){} location.reload(); },
+  adminOpen:()=>{ A.loaded=false; go('admin'); adminLoad(); },
+  admExt:(a,el)=>{ const p=A.profiles.find(x=>x.id===a); const base=Math.max(Date.now(), p&&p.access_expires_at?new Date(p.access_expires_at).getTime():0); admSet(a, new Date(base+Number(el.dataset.days)*86400000).toISOString()); },
+  admLife:(a)=>{ if(confirm('আজীবন মেয়াদ দেবেন?')) admSet(a,null); },
+  admRev:(a)=>{ if(confirm('এখনই এই ইউজারের অ্যাক্সেস বন্ধ করবেন?')) admSet(a,new Date(Date.now()-1000).toISOString()); },
+  admReset:(a,el)=>admReset(a, el.dataset.req, el.dataset.ph),
+  admDismiss:async(a)=>{ await sb.from('pin_reset_requests').update({status:'done',handled_at:new Date().toISOString()}).eq('id',a); adminLoad(); },
+  admCfg:async()=>{ const { error }=await sb.from('app_config').update({ contact_phone:$('c_phone').value||null, contact_whatsapp:$('c_wa').value.replace(/[^0-9]/g,'')||null, payment_instructions:$('c_pay').value||null, updated_at:new Date().toISOString() }).eq('id',1); toast(error?friendlyError(error):'✔ সংরক্ষণ হয়েছে'); if(!error) adminLoad(); },
   forgot:()=>{ S.authStep='forgot'; render(); },
   forgotSend:()=>forgotSend(),
 };
@@ -808,7 +899,7 @@ function maybeForcePin(){
 }
 function wipe(){
   Object.assign(S,{ user:null, profile:null, cfg:null, accounts:[], account:null, contacts:[], txns:[], trash:[], loaded:false, loadError:false, expired:false, forced:false, syncing:false, authStep:'phone', pin:'', pinFirst:'', pinMode:null });
-  Q=[]; FAILED=[]; closeSheet(); render();
+  Q=[]; FAILED=[]; A.profiles=[]; A.reqs=[]; A.cfg={}; A.loaded=false; closeSheet(); render();
 }
 async function boot(){
   const uid=S.user.id;
@@ -823,6 +914,7 @@ async function boot(){
   }catch(e){ console.warn(e); if(!c) S.loadError=true; }
   if(!S.loadError) S.loaded=true;
   render(); maybeForcePin();
+  if(S.profile && S.profile.is_admin && navigator.onLine) adminLoad();   // নেভ-ব্যাজে অপেক্ষমাণ পিন-অনুরোধের সংখ্যা
 }
 sb.auth.onAuthStateChange((ev, session)=>{
   setTimeout(()=>{

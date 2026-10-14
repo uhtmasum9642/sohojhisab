@@ -55,7 +55,7 @@ create table if not exists public.transactions (
   transaction_no text not null,
   transaction_date date not null default current_date,
   transaction_type text not null
-    check (transaction_type in ('income','expense','receivable','payable','receive_due','pay_due')),
+    check (transaction_type in ('income','expense','receivable','payable','receive_due','pay_due','expense_credit','income_credit')),
   status text not null default 'completed',
   account_id uuid references public.accounts(id) on delete set null,
   contact_id uuid references public.contacts(id) on delete set null,
@@ -63,8 +63,9 @@ create table if not exists public.transactions (
   paid_amount numeric(14,2) not null default 0,
   due_amount numeric(14,2) not null default 0,
   notes text,
+  category text,                            -- খাবার/বাজার/মজুরি... (না বাছলে null)
   created_at timestamptz not null default now(),
-  deleted_at timestamptz                    -- মুছলে এটা সেট হয় (ট্র্যাশ); আসলে ডিলিট হয় না
+  deleted_at timestamptz                   -- মুছলে এটা সেট হয় (ট্র্যাশ); আসলে ডিলিট হয় না
 );
 create unique index if not exists transactions_user_txno on public.transactions(user_id, transaction_no);
 create index if not exists transactions_user_date on public.transactions(user_id, transaction_date desc);
@@ -96,7 +97,7 @@ begin
     new.id,
     coalesce(new.raw_user_meta_data->>'full_name', ''),
     new.email,
-    now() + interval 'null',            -- ★ ফ্রি ট্রায়াল ৩০ দিন। আজীবন চাইলে এটা null লিখুন; বন্ধ রাখতে এই লাইন বদলে now() করুন
+    null,            -- ★ আজীবন। ৩০ দিনের ট্রায়াল চাইলে null-এর জায়গায় লিখুন: now() + interval '30 days'
     now()
   )
   on conflict (id) do nothing;
@@ -107,13 +108,14 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created after insert on auth.users
   for each row execute function public.handle_new_user();
 
--- সাধারণ ইউজার নিজের মেয়াদ/অ্যাডমিন-অধিকার বদলাতে পারবে না (শুধু অ্যাডমিন বা সার্ভার পারবে)
+-- সাধারণ ইউজার নিজের মেয়াদ/অ্যাডমিন-অধিকার/email বদলাতে পারবে না (শুধু অ্যাডমিন বা সার্ভার পারবে)
 create or replace function public.protect_profile_fields() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
   if auth.uid() is not null and not public.is_admin() then
     if new.is_admin is distinct from old.is_admin
        or new.access_expires_at is distinct from old.access_expires_at
+       or new.email is distinct from old.email
        or new.id is distinct from old.id then
       raise exception 'not allowed';
     end if;

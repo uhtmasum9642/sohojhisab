@@ -810,6 +810,25 @@ function applySpeech(text){
   setHear('শুনলাম: '+esc(text)+'<br><b>'+(r.amount>0?'ঠিক না হলে নিচে ঠিক করে নিন।':'টাকার অঙ্ক বুঝতে পারিনি। নাম্বার-প্যাডে লিখুন।')+'</b>');
 }
 
+// ===================== FIRST-TIME GUIDE (৩ স্লাইড) =====================
+const guidePic = ks => '<div class="actions" style="margin:0">'+ks.map(k=>`<div class="act ${TYPE[k].cls}"><span class="ic">${TYPE[k].icon}</span>${TYPE[k].label}</div>`).join('')+'</div>';
+const GUIDE = [
+  { pic:guidePic(['income','expense']), say:'টাকা পেলে সবুজ "আয়" বাটনে চাপ দিন। টাকা খরচ করলে লাল "খরচ" বাটনে চাপ দিন।' },
+  { pic:guidePic(['receivable','payable']), say:'কাউকে ধার দিলে "ধার দিলাম", কারো থেকে ধার নিলে "ধার নিলাম" চাপুন। কে কত দেবে, "মানুষ"-এ দেখবেন।' },
+  { pic:'<div class="mic">🎤 বলে লিখুন</div>', say:'মুখে বলেও লেখা যায়, যেমন: "পঞ্চাশ টাকা চা খেলাম"। ভুল হলে মুছে ফেলুন, আবার ফেরত আনা যায়।' },
+];
+function showGuide(i){
+  S.guide=i; S.sentence=GUIDE[i].say;   // 🔊 বাটন একই speak ব্যবহার করে
+  const last = i===GUIDE.length-1;
+  openSheet(`<div class="dots" style="margin:0 0 .9rem">${GUIDE.map((_,j)=>`<div class="dot ${j<=i?'f':''}"></div>`).join('')}</div>${GUIDE[i].pic}
+    <div class="card" style="font-size:1.2rem;font-weight:600;margin:.9rem 0 0">${esc(GUIDE[i].say)}</div>
+    <div class="gap"><button class="btn primary" data-act="guideNext">${last?'✔ শুরু করুন':'পরের পাতা →'}</button>
+    <button class="btn ghost sm" data-act="speak">🔊 শুনুন</button>
+    ${last?'':'<button class="btn ghost sm" data-act="guideDone">✖ বাদ দিন</button>'}</div>`);
+}
+// প্রতি ইউজারে একবার; বাইরে চাপ দিয়ে বন্ধ করলে পরের বার আবার দেখাবে
+function maybeGuide(){ if(S.loaded && !S.loadError && !S.expired && !S.forced && !lsGet(keyOf('guide'))) showGuide(0); }
+
 // ===================== ACTIONS =====================
 function go(screen, params){ S.screen=screen; S.params=params||{}; render(); window.scrollTo(0,0); }
 function render(){
@@ -878,6 +897,8 @@ const ACT = {
   admCfg:async()=>{ const { error }=await sb.from('app_config').update({ contact_phone:$('c_phone').value||null, contact_whatsapp:$('c_wa').value.replace(/[^0-9]/g,'')||null, payment_instructions:$('c_pay').value||null, updated_at:new Date().toISOString() }).eq('id',1); toast(error?friendlyError(error):'✔ সংরক্ষণ হয়েছে'); if(!error) adminLoad(); },
   forgot:()=>{ S.authStep='forgot'; render(); },
   forgotSend:()=>forgotSend(),
+  guideNext:()=>{ if(S.guide<GUIDE.length-1) showGuide(S.guide+1); else ACT.guideDone(); },
+  guideDone:()=>{ lsSet(keyOf('guide'),'1'); closeSheet(); },
 };
 async function changePinStep(){
   const t=$('chgTitle'), m=$('sheetMsg');
@@ -913,7 +934,7 @@ async function boot(){
     S.loadError=false;
   }catch(e){ console.warn(e); if(!c) S.loadError=true; }
   if(!S.loadError) S.loaded=true;
-  render(); maybeForcePin();
+  render(); maybeForcePin(); maybeGuide();
   if(S.profile && S.profile.is_admin && navigator.onLine) adminLoad();   // নেভ-ব্যাজে অপেক্ষমাণ পিন-অনুরোধের সংখ্যা
 }
 sb.auth.onAuthStateChange((ev, session)=>{

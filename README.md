@@ -1,2 +1,12 @@
-# sohojhisab
-Personal Money manager for rural people
+# সহজ হিসাব
+
+দিনমজুর, দোকানদার, গৃহিণীদের জন্য অতি সহজ আয়-খরচ ও ধারের খাতা। ভয়েসে বা হাতে লেখা, নেট ছাড়াও চলে।
+
+- `index.html` — মূল অ্যাপ (ফোন নাম্বার + ৬ সংখ্যার পিন)
+- `admin.html` — অ্যাডমিন পেজ (ইউজার, মেয়াদ, পিন-রিসেট)
+- `config.js` — Supabase লিংক ও কী (এখানেই বদলাতে হয়)
+- `sw.js`, `manifest.json`, `icon-*.png` — অফলাইন ও ফোনে ইনস্টলের জন্য
+- `supabase/schema.sql` — ডাটাবেজ সেটআপ
+- `supabase/migration_category_credit.sql` — আগে থেকে চালু ডাটাবেজের জন্য একবারের আপডেট (১৫ অক্টো ২০২৬)
+- `supabase/functions/reset-pin/` — পিন-রিসেট ফাংশন
+- `SETUP.md` (সেটআপ), `userguide.md` (ব্যবহার-নির্দেশিকা), `CLAUDE.md` ও `PLAN.md` (Claude Code-এর জন্য) — এগুলো শুধু আপনার কম্পিউটারে থাকবে, GitHub-এ তোলার দরকার নেই

@@ -126,6 +126,37 @@ drop trigger if exists protect_profile_fields on public.profiles;
 create trigger protect_profile_fields before update on public.profiles
   for each row execute function public.protect_profile_fields();
 
+-- অ্যাডমিন একজন ইউজারের জন্য র‍্যান্ডম ৬-সংখ্যার নতুন পিন বানান (অ্যাপ: sb.rpc('admin_reset_pin'))
+-- ইউজার ঢুকলে অ্যাপ জোর করে নিজের পিন বানাতে বলে (must_change_pin = true)
+create or replace function public.admin_reset_pin(p_user uuid, p_request uuid default null)
+returns json
+language plpgsql security definer
+set search_path = public, extensions, pg_temp
+as $$
+declare
+  v_email text;
+  v_pin text := (100000 + ('x' || encode(extensions.gen_random_bytes(3), 'hex'))::bit(24)::int % 900000)::text;
+begin
+  if not public.is_admin() then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+  select email into v_email from auth.users where id = p_user;
+  if v_email is null or v_email not like '%@khata.app' then
+    raise exception 'not_phone_account' using errcode = '22023';
+  end if;
+  update auth.users
+     set encrypted_password = extensions.crypt(v_pin, extensions.gen_salt('bf')),
+         raw_user_meta_data = coalesce(raw_user_meta_data, '{}'::jsonb) || '{"must_change_pin": true}'::jsonb,
+         updated_at = now()
+   where id = p_user;
+  update public.pin_reset_requests
+     set status = 'done', handled_at = now()
+   where status = 'pending' and (id = p_request or phone = split_part(v_email, '@', 1));
+  return json_build_object('pin', v_pin, 'phone', split_part(v_email, '@', 1));
+end $$;
+revoke all on function public.admin_reset_pin(uuid, uuid) from public, anon;
+grant execute on function public.admin_reset_pin(uuid, uuid) to authenticated;
+
 -- ---------- ৪) নিরাপত্তা-নিয়ম (Row Level Security) ----------
 alter table public.profiles            enable row level security;
 alter table public.app_config          enable row level security;

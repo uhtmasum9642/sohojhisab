@@ -123,8 +123,11 @@ async function saveCfg(){
 }
 async function resetPin(userId, reqId, phone){
   if(!confirm('এই ইউজারের জন্য নতুন পিন বানাবেন? আগের পিন আর কাজ করবে না।')) return;
-  const { data, error } = await sb.functions.invoke('reset-pin', { body:{ user_id:userId, request_id:reqId||null } });
-  if(error || !data || data.error){ alert('পিন রিসেট হয়নি: '+((data&&data.error)||(error&&error.message)||'অজানা সমস্যা')+'\n(Supabase-এ reset-pin ফাংশন ডিপ্লয় করা আছে কিনা দেখুন — SETUP.md ধাপ ৫)'); return; }
+  const { data, error } = await sb.rpc('admin_reset_pin', { p_user:userId, p_request:reqId||null });
+  if(error || !data){
+    const m=String((error&&error.message)||'');
+    alert('পিন রিসেট হয়নি: '+(m.includes('forbidden')?'আপনার অ্যাকাউন্ট অ্যাডমিন নয়।':m.includes('not_phone_account')?'এটা ফোন-নাম্বারের অ্যাকাউন্ট নয়।':error&&error.code==='PGRST202'?'ডাটাবেজে পিন-রিসেটের ব্যবস্থা নেই — supabase/migration_reset_pin_rpc.sql চালান।':'ইন্টারনেট বা সার্ভারে সমস্যা, একটু পরে আবার চেষ্টা করুন।')); return;
+  }
   const ph = data.phone || phone;
   const msg = 'আসসালামু আলাইকুম। আপনার সহজ হিসাব অ্যাপের নতুন পিন: '+data.pin+' । এই পিন দিয়ে ঢুকুন, তারপর নিজের পছন্দের নতুন পিন বানিয়ে নেবেন।';
   $('modal').innerHTML = `<h2 style="margin-top:0">🔑 নতুন পিন তৈরি হয়েছে</h2><div class="pin">${esc(data.pin)}</div><div>নাম্বার: ${esc(ph)}</div>
